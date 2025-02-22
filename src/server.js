@@ -1,5 +1,4 @@
 const { port } = require('./config');
-const pino = require('pino')();
 const express = require('express');
 const sheetsService = require('./services/sheets.service');
 const wordpressService = require('./services/wordpress');
@@ -11,16 +10,16 @@ const hugoProcessor = new HugoProcessorService();
 async function initializeService(service, name) {
   try {
     await service.initialize();
-    pino.info(`${name} service initialized successfully`);
+    console.log(`[SERVER] ${name} service initialized successfully`);
     return true;
   } catch (error) {
-    pino.error({ err: error }, `${name} service failed to initialize`);
+    console.error(`[SERVER] ${name} service failed to initialize:`, error);
     return false;
   }
 }
 
 async function initialize() {
-  pino.info('Starting server initialization...');
+  console.log('[SERVER] Starting server initialization...');
 
   const app = express();
   app.use(express.json());
@@ -39,7 +38,7 @@ async function initialize() {
       initializeService(hugoService, 'Hugo')
     ]);
   } catch (error) {
-    pino.error('Error initializing services:', error);
+    console.error('[SERVER] Error initializing services:', error);
   }
 
   // Set up routes
@@ -48,7 +47,7 @@ async function initialize() {
       const result = await hugoProcessor.processWorkflow();
       res.json(result);
     } catch (error) {
-      pino.error('Error processing Hugo workflow:', error);
+      console.error('[SERVER] Error processing Hugo workflow:', error);
       res.status(500).json({
         success: false,
         error: error.message
@@ -70,7 +69,7 @@ async function initialize() {
 
   // Start server
   app.listen(port, () => {
-    pino.info(`Server listening on port ${port}`);
+    console.log(`[SERVER] Server listening on port ${port}`);
   });
 
   return app;
@@ -78,6 +77,6 @@ async function initialize() {
 
 // Start the server
 initialize().catch(error => {
-  pino.error('Failed to initialize server:', error);
+  console.error('[SERVER] Failed to initialize server:', error);
   process.exit(1);
 });
