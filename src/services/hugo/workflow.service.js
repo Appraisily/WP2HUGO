@@ -2,6 +2,7 @@ const contentStorage = require('../../utils/storage');
 const sheetsService = require('../sheets.service');
 const dataCollector = require('./data-collector.service');
 const contentGenerator = require('./content-generator.service');
+const contentAnalyzer = require('./content-analyzer.service');
 
 class WorkflowService {
   constructor() {
@@ -94,18 +95,22 @@ class WorkflowService {
       console.log('[HUGO] Processing keyword:', keyword);
 
       // Create folder path
-      const folderPath = `content/${this.createSlug(keyword)}`;
+      const slug = this.createSlug(keyword);
+      const folderPath = `${slug}`;
 
       // Collect data
-      const { keywordData, paaData, serpData } = await dataCollector.collectData(keyword, folderPath);
+      const collectedData = await dataCollector.collectData(keyword, folderPath);
+
+      // Analyze collected data
+      console.log('[HUGO] Analyzing collected data');
+      const contentAnalysis = await contentAnalyzer.analyzeKeyword(keyword, collectedData);
 
       // Store collected data
       await contentStorage.storeContent(
-        `${folderPath}/collected-data.json`,
+        `${folderPath}/research/collected-data.json`,
         {
-          keywordData,
-          paaData,
-          serpData,
+          ...collectedData,
+          contentAnalysis,
           metadata: {
             keyword,
             processedDate: new Date().toISOString(),
@@ -120,10 +125,11 @@ class WorkflowService {
         slug: this.createSlug(keyword),
         folderPath,
         dataCollected: {
-          hasKeywordData: Boolean(keywordData),
-          hasPaaData: Boolean(paaData?.results?.length),
-          hasSerpData: Boolean(serpData?.serp?.length),
-          hasPerplexityData: Boolean(perplexityData)
+          hasKeywordData: Boolean(collectedData.keywordData),
+          hasPaaData: Boolean(collectedData.paaData?.results?.length),
+          hasSerpData: Boolean(collectedData.serpData?.serp?.length),
+          hasPerplexityData: Boolean(collectedData.perplexityData),
+          hasContentAnalysis: Boolean(contentAnalysis)
         },
         success: true
       };
@@ -143,12 +149,11 @@ class WorkflowService {
       total: results.length,
       successful: results.filter(r => r.success).length,
       failed: results.filter(r => !r.success).length,
-      failed: results.filter(r => !r.success).length,
       timestamp: new Date().toISOString()
     };
 
     await contentStorage.storeContent(
-      'logs/workflow-summary.json',
+      `logs/${new Date().toISOString().split('T')[0]}/workflow-summary.json`,
       { summary, results },
       { type: 'workflow_summary' }
     );

@@ -6,21 +6,24 @@ const perplexityService = require('../perplexity.service');
 
 class DataCollectorService {
   async collectData(keyword, folderPath) {
+    const slug = this.createSlug(keyword);
+    const keywordPath = `${slug}`;
+
     // Get keyword research data
     console.log('[HUGO] Fetching keyword data for:', keyword);
-    const keywordData = await this.getKeywordData(keyword, folderPath);
+    const keywordData = await this.getKeywordData(keyword, keywordPath);
 
     // Get People Also Ask questions
     console.log('[HUGO] Fetching PAA data for:', keyword);
-    const paaData = await this.getPaaData(keyword, folderPath);
+    const paaData = await this.getPaaData(keyword, keywordPath);
 
     // Get SERP data
     console.log('[HUGO] Fetching SERP data for:', keyword);
-    const serpData = await this.getSerpData(keyword, keywordData.volume || 0, folderPath);
+    const serpData = await this.getSerpData(keyword, keywordData.volume || 0, keywordPath);
 
     // Get Perplexity insights
     console.log('[HUGO] Fetching Perplexity insights for:', keyword);
-    const perplexityData = await this.getPerplexityData(keyword, folderPath, serpData);
+    const perplexityData = await this.getPerplexityData(keyword, keywordPath, serpData);
 
     return {
       keywordData,
@@ -32,7 +35,7 @@ class DataCollectorService {
 
   async getKeywordData(keyword, folderPath) {
     try {
-      const existingData = await contentStorage.getContent(`${folderPath}/keyword-data.json`);
+      const existingData = await contentStorage.getContent(`${folderPath}/research/keyword-data.json`);
       if (existingData?.data) {
         console.log('[HUGO] Using existing keyword data');
         return existingData.data;
@@ -43,7 +46,7 @@ class DataCollectorService {
 
     const data = await keywordResearchService.getKeywordData(keyword);
     await contentStorage.storeContent(
-      `${folderPath}/keyword-data.json`,
+      `${folderPath}/research/keyword-data.json`,
       data,
       { type: 'keyword_data', keyword }
     );
@@ -52,7 +55,7 @@ class DataCollectorService {
 
   async getPaaData(keyword, folderPath) {
     try {
-      const existingPaa = await contentStorage.getContent(`${folderPath}/paa-data.json`);
+      const existingPaa = await contentStorage.getContent(`${folderPath}/research/paa-data.json`);
       if (existingPaa?.data) {
         console.log('[HUGO] Using existing PAA data');
         return existingPaa.data;
@@ -63,7 +66,7 @@ class DataCollectorService {
 
     const data = await paaService.getQuestions(keyword);
     await contentStorage.storeContent(
-      `${folderPath}/paa-data.json`,
+      `${folderPath}/research/paa-data.json`,
       data,
       { type: 'paa_data', keyword }
     );
@@ -72,7 +75,7 @@ class DataCollectorService {
 
   async getSerpData(keyword, volume, folderPath) {
     try {
-      const existingSerp = await contentStorage.getContent(`${folderPath}/serp-data.json`);
+      const existingSerp = await contentStorage.getContent(`${folderPath}/research/serp-data.json`);
       if (existingSerp?.data) {
         console.log('[HUGO] Using existing SERP data');
         return existingSerp.data;
@@ -83,7 +86,7 @@ class DataCollectorService {
 
     const data = await serpService.getSearchResults(keyword, volume);
     await contentStorage.storeContent(
-      `${folderPath}/serp-data.json`,
+      `${folderPath}/research/serp-data.json`,
       data,
       { type: 'serp_data', keyword }
     );
@@ -92,7 +95,7 @@ class DataCollectorService {
 
   async getPerplexityData(keyword, folderPath, serpData) {
     try {
-      const existingData = await contentStorage.getContent(`${folderPath}/perplexity-data.json`);
+      const existingData = await contentStorage.getContent(`${folderPath}/research/perplexity-data.json`);
       if (existingData?.data) {
         console.log('[HUGO] Using existing Perplexity data');
         return existingData.data;
@@ -120,7 +123,7 @@ class DataCollectorService {
     };
 
     await contentStorage.storeContent(
-      `${folderPath}/perplexity-data.json`,
+      `${folderPath}/research/perplexity-data.json`,
       data,
       { type: 'perplexity_data', keyword }
     );

@@ -47,7 +47,6 @@ class PerplexityService {
   async makeRequest(prompt, type, options = {}) {
     const {
       model = 'sonar',
-      maxTokens = 250,
       temperature = 0.2,
       top_p = 0.9
     } = options;
@@ -67,7 +66,6 @@ class PerplexityService {
           messages: [
             ...messages
           ],
-          max_tokens: maxTokens,
           temperature,
           top_p,
           return_images: false,
@@ -109,8 +107,8 @@ class PerplexityService {
       timestamp: new Date().toISOString()
     };
 
-    const hash = Buffer.from(prompt).toString('base64').substring(0, 32);
-    const filePath = `perplexity/${type}/${hash}.json`;
+    const hash = Buffer.from(prompt).toString('base64').substring(0, 8);
+    const filePath = `perplexity/${hash}.json`;
 
     await contentStorage.storeContent(
       filePath,
