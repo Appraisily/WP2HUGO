@@ -105,20 +105,101 @@ class WorkflowService {
       console.log('[HUGO] Analyzing collected data');
       const contentAnalysis = await contentAnalyzer.analyzeKeyword(keyword, collectedData);
 
+      // Send valuation description to valuation agent if available
+      if (contentAnalysis.valuation_description) {
+        try {
+          console.log('[HUGO] Sending to valuation agent:', contentAnalysis.valuation_description);
+          const valuationResponse = await axios.post(
+            'https://valuer-agent-856401495068.us-central1.run.app/api/find-value-range',
+            { text: contentAnalysis.valuation_description },
+            { headers: { 'Content-Type': 'application/json' } }
+          );
+          
+          // Log the value range response
+          console.log('[HUGO] Received valuation range:', {
+            minValue: valuationResponse.data.minValue,
+            maxValue: valuationResponse.data.maxValue,
+            mostLikelyValue: valuationResponse.data.mostLikelyValue
+          });
+          
+          // Store valuation response
+          await contentStorage.storeContent(
+            `${folderPath}/research/valuation-data.json`,
+            {
+              description: contentAnalysis.valuation_description,
+              value_range: {
+                min: valuationResponse.data.minValue,
+                max: valuationResponse.data.maxValue,
+                most_likely: valuationResponse.data.mostLikelyValue
+              },
+              explanation: valuationResponse.data.explanation,
+              auction_results: valuationResponse.data.auctionResults,
+              timestamp: new Date().toISOString()
+            },
+            { type: 'valuation_data', keyword }
+          );
+
+          // Include valuation data in the result
+          return {
+            ...result,
+            valuation: {
+              range: {
+                min: valuationResponse.data.minValue,
+                max: valuationResponse.data.maxValue,
+                most_likely: valuationResponse.data.mostLikelyValue
+              },
+              has_auction_results: Boolean(valuationResponse.data.auctionResults?.length)
+            }
+          };
+        } catch (error) {
+          console.error('[HUGO] Error getting valuation:', error);
+          // Continue processing even if valuation fails
+        }
+      }
+
       // Store collected data
       await contentStorage.storeContent(
-        `${folderPath}/research/collected-data.json`,
+        `${folderPath}/collected-data.json`,
         {
           ...collectedData,
           contentAnalysis,
+          valuation: valuationResponse?.data ? {
+            value_range: {
+              min: valuationResponse.data.minValue,
+              max: valuationResponse.data.maxValue,
+              most_likely: valuationResponse.data.mostLikelyValue
+            },
+            explanation: valuationResponse.data.explanation,
+            auction_results: valuationResponse.data.auctionResults
+          } : null,
           metadata: {
             keyword,
             processedDate: new Date().toISOString(),
-            status: 'data_collected'
+            status: 'data_collected',
+            has_valuation: Boolean(valuationResponse?.data)
           }
         },
         { type: 'collected_data', keyword }
       );
+
+      // Store valuation data separately if available
+      if (valuationResponse?.data) {
+        await contentStorage.storeContent(
+          `${folderPath}/valuation.json`,
+          {
+            description: contentAnalysis.valuation_description,
+            value_range: {
+              min: valuationResponse.data.minValue,
+              max: valuationResponse.data.maxValue,
+              most_likely: valuationResponse.data.mostLikelyValue
+            },
+            explanation: valuationResponse.data.explanation,
+            auction_results: valuationResponse.data.auctionResults,
+            timestamp: new Date().toISOString()
+          },
+          { type: 'valuation_data', keyword }
+        );
+      }
 
       return {
         keyword,
@@ -129,7 +210,8 @@ class WorkflowService {
           hasPaaData: Boolean(collectedData.paaData?.results?.length),
           hasSerpData: Boolean(collectedData.serpData?.serp?.length),
           hasPerplexityData: Boolean(collectedData.perplexityData),
-          hasContentAnalysis: Boolean(contentAnalysis)
+          hasContentAnalysis: Boolean(contentAnalysis),
+          hasValuation: Boolean(valuationResponse?.data)
         },
         success: true
       };
