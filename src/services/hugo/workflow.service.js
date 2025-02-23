@@ -28,20 +28,6 @@ class WorkflowService {
       this.isProcessing = true;
       console.log('[HUGO] Starting workflow processing');
 
-      // Create paths
-      const date = new Date().toISOString().split('T')[0];
-      const basePath = `content/${date}`;
-
-      // Check for existing content
-      if (await this.checkExistingContent(basePath)) {
-        return {
-          success: true,
-          message: 'Content already exists for today',
-          existingContent: true,
-          path: basePath
-        };
-      }
-
       // Get row data
       const rows = await this.getRowData();
       if (!rows || rows.length === 0) {
@@ -53,7 +39,7 @@ class WorkflowService {
       }
 
       // Process row
-      const result = await this.processRow(rows[0], basePath);
+      const result = await this.processRow(rows[0]);
 
       // Store final summary
       await this.storeSummary([result]);
@@ -77,16 +63,6 @@ class WorkflowService {
     }
   }
 
-  async checkExistingContent(basePath) {
-    try {
-      console.log('[HUGO] Checking for existing content:', basePath);
-      const existingContent = await contentStorage.getContent(`${basePath}/content.json`);
-      return Boolean(existingContent);
-    } catch (error) {
-      return false;
-    }
-  }
-
   async getRowData() {
     console.log('[HUGO] Fetching row 2 from sheets');
     const rows = await sheetsService.getAllRows();
@@ -107,7 +83,7 @@ class WorkflowService {
     return rows;
   }
 
-  async processRow(row, basePath) {
+  async processRow(row) {
     try {
       const keyword = row['KWs'];
       
@@ -118,7 +94,7 @@ class WorkflowService {
       console.log('[HUGO] Processing keyword:', keyword);
 
       // Create folder path
-      const folderPath = `${basePath}/${this.createSlug(keyword)}`;
+      const folderPath = `content/${this.createSlug(keyword)}`;
 
       // Collect data
       const { keywordData, paaData, serpData } = await dataCollector.collectData(keyword, folderPath);
@@ -165,11 +141,13 @@ class WorkflowService {
     const summary = {
       total: results.length,
       successful: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success).length
+      failed: results.filter(r => !r.success).length,
+      failed: results.filter(r => !r.success).length,
+      timestamp: new Date().toISOString()
     };
 
     await contentStorage.storeContent(
-      `logs/summary/${new Date().toISOString().split('T')[0]}.json`,
+      'logs/workflow-summary.json',
       { summary, results },
       { type: 'workflow_summary' }
     );

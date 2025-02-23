@@ -7,8 +7,6 @@ const hugoProcessor = require('./services/hugo-processor.service');
 const keywordResearchService = require('./services/keyword-research.service');
 const paaService = require('./services/paa.service');
 const serpService = require('./services/serp.service');
-const perplexityService = require('./services/perplexity.service');
-const artAppraiserRoutes = require('./routes/art-appraiser.routes');
 
 async function initializeService(service, name) {
   try {
@@ -42,19 +40,17 @@ async function initialize() {
     hugo: false,
     keyword: false,
     paa: false,
-    serp: false,
-    perplexity: false
+    serp: false
   };
 
   try {
-    [serviceStatus.storage, serviceStatus.sheets, serviceStatus.hugo, serviceStatus.keyword, serviceStatus.paa, serviceStatus.serp, serviceStatus.perplexity] = await Promise.all([
+    [serviceStatus.storage, serviceStatus.sheets, serviceStatus.hugo, serviceStatus.keyword, serviceStatus.paa, serviceStatus.serp] = await Promise.all([
       initializeService(contentStorage, 'Storage'),
       initializeService(sheetsService, 'Sheets'),
       initializeService(hugoService, 'Hugo'),
       initializeService(keywordResearchService, 'Keyword Research'),
       initializeService(paaService, 'People Also Ask'),
-      initializeService(serpService, 'SERP'),
-      initializeService(perplexityService, 'Perplexity')
+      initializeService(serpService, 'SERP')
     ]);
   } catch (error) {
     console.error('[SERVER] Error initializing services:', error);
@@ -74,9 +70,6 @@ async function initialize() {
     }
   });
 
-  // Art Appraiser routes
-  app.use('/api/art-appraiser', artAppraiserRoutes);
-
   // Health check endpoint
   app.get('/health', (req, res) => {
     res.json({
@@ -87,8 +80,7 @@ async function initialize() {
         hugo: serviceStatus.hugo ? 'connected' : 'disconnected',
         keyword: serviceStatus.keyword ? 'connected' : 'disconnected',
         paa: serviceStatus.paa ? 'connected' : 'disconnected',
-        serp: serviceStatus.serp ? 'connected' : 'disconnected',
-        perplexity: serviceStatus.perplexity ? 'connected' : 'disconnected'
+        serp: serviceStatus.serp ? 'connected' : 'disconnected'
       }
     });
   });

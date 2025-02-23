@@ -46,21 +46,23 @@ class PerplexityService {
 
   async makeRequest(prompt, type, options = {}) {
     const {
-      model = 'pplx-7b-online',
+      model = 'pplx-70b-online',
       maxTokens = 250,
-      temperature = 0.3,
+      temperature = 0.1,
       topP = 0.9
     } = options;
 
     try {
       console.log(`[PERPLEXITY] Making ${type} request for prompt:`, prompt.substring(0, 100) + '...');
 
+      const systemPrompt = 'You are a keyword research assistant.';
+
       const response = await axios.post(
         this.apiUrl,
         {
           model,
           messages: [
-            { role: 'system', content: 'You are a keyword research assistant.' },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
           ],
           max_tokens: maxTokens,
