@@ -2,6 +2,7 @@ const contentStorage = require('../../utils/storage');
 const keywordResearchService = require('../keyword-research.service');
 const paaService = require('../paa.service');
 const serpService = require('../serp.service');
+const perplexityService = require('../perplexity.service');
 
 class DataCollectorService {
   async collectData(keyword, folderPath) {
@@ -17,10 +18,15 @@ class DataCollectorService {
     console.log('[HUGO] Fetching SERP data for:', keyword);
     const serpData = await this.getSerpData(keyword, keywordData.volume || 0, folderPath);
 
+    // Get Perplexity insights
+    console.log('[HUGO] Fetching Perplexity insights for:', keyword);
+    const perplexityData = await this.getPerplexityData(keyword, serpData, folderPath);
+
     return {
       keywordData,
       paaData,
-      serpData
+      serpData,
+      perplexityData
     };
   }
 
@@ -81,6 +87,41 @@ class DataCollectorService {
       data,
       { type: 'serp_data', keyword }
     );
+    return data;
+  }
+
+  async getPerplexityData(keyword, serpData, folderPath) {
+    try {
+      const existingData = await contentStorage.getContent(`${folderPath}/perplexity-data.json`);
+      if (existingData?.data) {
+        console.log('[HUGO] Using existing Perplexity data');
+        return existingData.data;
+      }
+    } catch (error) {
+      console.log('[HUGO] No existing Perplexity data, fetching fresh');
+    }
+
+    const variations = await perplexityService.generateKeywordVariations(keyword);
+    const intent = await perplexityService.analyzeSearchIntent(keyword);
+    const context = await perplexityService.getContextualExpansion(keyword);
+    const topics = await perplexityService.generateContentTopics(keyword);
+    const complement = await perplexityService.complementStructuredData(keyword, serpData);
+
+    const data = {
+      variations,
+      intent,
+      context,
+      topics,
+      complement,
+      timestamp: new Date().toISOString()
+    };
+
+    await contentStorage.storeContent(
+      `${folderPath}/perplexity-data.json`,
+      data,
+      { type: 'perplexity_data', keyword }
+    );
+
     return data;
   }
 }
