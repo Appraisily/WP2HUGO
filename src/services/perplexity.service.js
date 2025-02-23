@@ -46,28 +46,35 @@ class PerplexityService {
 
   async makeRequest(prompt, type, options = {}) {
     const {
-      model = 'pplx-70b-online',
+      model = 'sonar',
       maxTokens = 250,
-      temperature = 0.1,
-      topP = 0.9
+      temperature = 0.2,
+      top_p = 0.9
     } = options;
 
     try {
       console.log(`[PERPLEXITY] Making ${type} request for prompt:`, prompt.substring(0, 100) + '...');
 
-      const systemPrompt = 'You are a keyword research assistant.';
+      const messages = [
+        { role: 'system', content: 'Be precise and concise.' },
+        { role: 'user', content: prompt }
+      ];
 
       const response = await axios.post(
         this.apiUrl,
         {
           model,
           messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt }
+            ...messages
           ],
           max_tokens: maxTokens,
           temperature,
-          top_p: topP
+          top_p,
+          return_images: false,
+          return_related_questions: false,
+          stream: false,
+          presence_penalty: 0,
+          frequency_penalty: 1
         },
         {
           headers: {
@@ -77,7 +84,7 @@ class PerplexityService {
         }
       );
 
-      const result = response.data.choices[0]?.message?.content;
+      const result = response.data?.choices?.[0]?.message?.content;
 
       if (!result) {
         throw new Error('No content in Perplexity response');
