@@ -4,6 +4,7 @@ class ContentStorage {
   constructor() {
     this.storage = new Storage();
     this.bucketName = 'images_free_reports';
+    this.isInitialized = false;
     this.bucket = null;
     console.log('[STORAGE] Initializing storage service with bucket:', this.bucketName);
   }
@@ -12,7 +13,9 @@ class ContentStorage {
     try {
       console.log('[STORAGE] Attempting to connect to bucket:', this.bucketName);
       const [bucket] = await this.storage.bucket(this.bucketName).get();
+      await bucket.exists(); // Verify bucket access
       this.bucket = bucket;
+      this.isInitialized = true;
       
       console.log('[STORAGE] Successfully initialized bucket:', this.bucketName);
       return true;
@@ -26,10 +29,11 @@ class ContentStorage {
     console.log('[STORAGE] Starting content storage process:', {
       filePath,
       contentSize: JSON.stringify(content).length,
-      metadata
+      metadata,
+      isInitialized: this.isInitialized
     });
 
-    if (!this.bucket) {
+    if (!this.isInitialized || !this.bucket) {
       throw new Error('Storage not initialized');
     }
 
