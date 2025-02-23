@@ -3,7 +3,7 @@ const { Storage } = require('@google-cloud/storage');
 class ContentStorage {
   constructor() {
     this.storage = new Storage();
-    this.bucketName = 'images_free_reports';
+    this.bucketName = 'hugo-posts-content';
     console.log('[STORAGE] Initializing storage service with bucket:', this.bucketName);
   }
 

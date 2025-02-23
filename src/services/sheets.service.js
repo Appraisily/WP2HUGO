@@ -75,21 +75,25 @@ class SheetsService {
     }
     
     try {
-      // Get all rows from the SEO sheet
+      console.log('[SHEETS] Fetching only row 2 for debugging');
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.sheetsId,
-        range: 'SEO!A2:D', // Start from row 2 to skip headers
+        range: 'SEO!A2:D2', // Only get row 2
       });
 
       const rows = response.data.values || [];
+      console.log('[SHEETS] Row 2 data:', rows[0]);
       
       // Convert rows to objects with column headers
-      return rows.map(row => ({
+      const processedRows = rows.map(row => ({
         'KWs': row[0]?.trim() || '',
         'SEO TItle': row[1]?.trim() || '',
         'Post ID': row[2]?.trim() || '',
         '2025-01-28T10:25:40.252Z': row[3]?.trim() || ''
       }));
+
+      console.log('[SHEETS] Processed row 2:', processedRows[0]);
+      return processedRows;
 
     } catch (error) {
       console.error('[SHEETS] Error getting all rows:', error);

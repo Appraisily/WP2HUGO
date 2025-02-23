@@ -1,11 +1,18 @@
 const sheetsService = require('./sheets.service');
-const wordpressService = require('./wordpress');
-const hugoService = require('./hugo.service');
 const contentStorage = require('../utils/storage');
+const openaiService = require('./openai.service');
+const keywordResearchService = require('./keyword-research.service');
 
 class HugoProcessorService {
   constructor() {
     this.isProcessing = false;
+  }
+
+  createSlug(text) {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
   }
 
   async processWorkflow() {
@@ -21,11 +28,12 @@ class HugoProcessorService {
       this.isProcessing = true;
       console.log('[HUGO] Starting workflow processing');
 
-      // Get all rows from the Hugo sheet
-      const rows = await sheetsService.getHugoRows();
+      console.log('[HUGO] Fetching row 2 from sheets');
+      console.log('[HUGO] Calling sheetsService.getAllRows()');
+      const rows = await sheetsService.getAllRows();
       
       if (!rows || rows.length === 0) {
-        console.log('[HUGO] No rows found in spreadsheet');
+        console.log('[HUGO] No rows found in spreadsheet (getAllRows returned empty)');
         return {
           success: true,
           message: 'No rows to process',
@@ -33,76 +41,108 @@ class HugoProcessorService {
         };
       }
 
-      console.log(`[HUGO] Found ${rows.length} rows to process`);
+      console.log('[HUGO] Row 2 data received:', {
+        rowData: rows[0],
+        hasKWs: Boolean(rows[0]?.['KWs']),
+        hasTitle: Boolean(rows[0]?.['SEO TItle']),
+        hasPostId: Boolean(rows[0]?.['Post ID']),
+        hasDate: Boolean(rows[0]?.['2025-01-28T10:25:40.252Z'])
+      });
       
       const results = [];
-      for (const row of rows) {
-        try {
-          // Extract post ID and keyword
-          const postId = row['Post ID'];
-          const keyword = row['Keyword'];
-          
-          if (!postId) {
-            console.warn('[HUGO] Missing Post ID in row:', row);
-            continue;
-          }
-
-          console.log(`[HUGO] Processing Post ID: ${postId}`);
-          
-          // Fetch post content from WordPress
-          const post = await wordpressService.getPost(postId);
-
-          // Create Hugo post
-          const hugoResult = await hugoService.createPost({
-            post: {
-              id: postId,
-              title: post.title,
-              content: post.content,
-              slug: this.createSlug(keyword),
-              date: row['Date'],
-              status: post.status
-            }
+      const row = rows[0]; // Only process first row (row 2 from sheet)
+      try {
+        const keyword = row['KWs'];
+        
+        if (!keyword) {
+          console.error('[HUGO] Missing keyword in row 2:', {
+            rowData: row,
+            availableFields: Object.keys(row)
           });
-
-          // Store the processed content
-          await contentStorage.storeContent(
-            `seo/keywords/${keyword}/hugo_conversion.json`,
-            {
-              original: post,
-              hugo: hugoResult,
-              metadata: {
-                keyword,
-                processedDate: row['Date'],
-                status: 'success'
-              }
-            }
-          );
-
-          results.push({
-            postId,
-            keyword,
-            title: post.title,
-            hugoSlug: hugoResult.slug,
-            success: true
-          });
-
-        } catch (error) {
-          console.error('[HUGO] Error processing row:', error);
-          results.push({
-            postId: row['Post ID'],
-            keyword: row['Keyword'],
-            success: false,
-            error: error.message
-          });
+          throw new Error('Missing keyword in row 2');
         }
+
+        console.log('[HUGO] Starting processing for row 2:', {
+          keyword,
+          seoTitle: row['SEO TItle'],
+          postId: row['Post ID'],
+          processedDate: row['2025-01-28T10:25:40.252Z']
+        });
+
+        // Create slug for folder name
+        const slug = this.createSlug(keyword);
+        const folderPath = `content/${slug}`;
+        console.log('[HUGO] Created paths:', { slug, folderPath });
+
+        // Get keyword research data
+        console.log('[HUGO] Fetching keyword data for:', keyword);
+        const keywordData = await keywordResearchService.getKeywordData(keyword);
+        console.log('[HUGO] Received keyword data:', {
+          keyword,
+          dataSize: JSON.stringify(keywordData).length,
+          hasVolume: Boolean(keywordData.volume),
+          hasIntent: Boolean(keywordData['search-intent'])
+        });
+
+        // Generate content structure
+        console.log('[HUGO] Generating content structure');
+        const structure = await this.generateStructure(keyword, keywordData);
+
+        // Store structure
+        console.log('[HUGO] Storing content structure');
+        await contentStorage.storeContent(
+          `${folderPath}/structure.json`,
+          structure,
+          { type: 'structure', keyword }
+        );
+
+        // Generate content
+        console.log('[HUGO] Generating content');
+        const content = await this.generateContent(structure);
+
+        // Store content
+        console.log('[HUGO] Storing generated content');
+        await contentStorage.storeContent(
+          `${folderPath}/content.json`,
+          {
+            content,
+            metadata: {
+              keyword,
+              processedDate: new Date().toISOString(),
+              status: 'success'
+            }
+          },
+          { type: 'content', keyword }
+        );
+
+        results.push({
+          keyword,
+          slug,
+          folderPath,
+          success: true
+        });
+
+      } catch (error) {
+        console.error('[HUGO] Error processing row 2:', error);
+        results.push({
+          keyword: row['KWs'],
+          success: false,
+          error: error.message
+        });
       }
 
-      // Summarize results
       const summary = {
         total: results.length,
         successful: results.filter(r => r.success).length,
         failed: results.filter(r => !r.success).length
       };
+
+      // Store final summary
+      await contentStorage.storeContent(
+        `logs/summary/${new Date().toISOString().split('T')[0]}.json`,
+        { summary, results },
+        { type: 'workflow_summary' }
+      );
 
       console.log('[HUGO] Workflow processing completed:', summary);
 
@@ -121,11 +161,66 @@ class HugoProcessorService {
     }
   }
 
-  createSlug(text) {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+  async generateStructure(keyword, keywordData) {
+    const messages = [
+      {
+        role: 'assistant',
+        content: `Create a detailed content structure for a blog post about "${keyword}".
+Use this keyword research data to optimize the content structure:
+${JSON.stringify(keywordData, null, 2)}
+
+Return ONLY valid JSON with this structure:
+{
+  "title": "SEO optimized title",
+  "sections": [
+    {
+      "type": "introduction|main|conclusion",
+      "title": "Section title",
+      "content": "Detailed outline of section content"
+    }
+  ],
+  "meta": {
+    "description": "SEO meta description",
+    "keywords": ["relevant", "keywords"],
+    "search_volume": number
+  }}`
+      }
+    ];
+
+    const completion = await openaiService.openai.createChatCompletion({
+      model: 'o3-mini',
+      messages
+    });
+
+    return JSON.parse(completion.data.choices[0].message.content);
+  }
+
+  async generateContent(structure) {
+    const messages = [
+      {
+        role: 'assistant',
+        content: `Create detailed blog post content based on this structure. 
+Return ONLY valid JSON with this structure:
+{
+  "title": "Post title",
+  "content": "Full markdown content",
+  "meta": {
+    "description": "Meta description",
+    "keywords": ["keywords"]
+  }}`
+      },
+      {
+        role: 'user',
+        content: JSON.stringify(structure)
+      }
+    ];
+
+    const completion = await openaiService.openai.createChatCompletion({
+      model: 'o3-mini',
+      messages
+    });
+
+    return JSON.parse(completion.data.choices[0].message.content);
   }
 }
 
