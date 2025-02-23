@@ -5,13 +5,23 @@ const openaiService = require('./openai.service');
 
 class HugoService {
   constructor() {
-    this.contentDir = path.join(process.cwd(), 'content', 'blog');
+    this.contentDir = path.join(process.cwd(), 'content');
+    this.blogDir = path.join(this.contentDir, 'blog');
   }
 
   async initialize() {
     try {
       // Ensure Hugo content directories exist
-      await fs.mkdir(this.contentDir, { recursive: true });
+      await fs.access(this.contentDir).catch(async () => {
+        console.log('[HUGO] Content directory does not exist, creating it');
+        await fs.mkdir(this.contentDir, { recursive: true });
+      });
+      
+      await fs.access(this.blogDir).catch(async () => {
+        console.log('[HUGO] Blog directory does not exist, creating it');
+        await fs.mkdir(this.blogDir, { recursive: true });
+      });
+
       console.log('[HUGO] Content directory initialized:', this.contentDir);
       return true;
     } catch (error) {

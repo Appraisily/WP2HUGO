@@ -3,7 +3,8 @@ const { Storage } = require('@google-cloud/storage');
 class ContentStorage {
   constructor() {
     this.storage = new Storage();
-    this.bucketName = 'hugo-posts-content';
+    this.bucketName = 'images_free_reports';
+    this.bucket = null;
     console.log('[STORAGE] Initializing storage service with bucket:', this.bucketName);
   }
 
@@ -12,6 +13,7 @@ class ContentStorage {
       console.log('[STORAGE] Attempting to connect to bucket:', this.bucketName);
       const [bucket] = await this.storage.bucket(this.bucketName).get();
       this.bucket = bucket;
+      
       console.log('[STORAGE] Successfully initialized bucket:', this.bucketName);
       return true;
     } catch (error) {
@@ -26,6 +28,10 @@ class ContentStorage {
       contentSize: JSON.stringify(content).length,
       metadata
     });
+
+    if (!this.bucket) {
+      throw new Error('Storage not initialized');
+    }
 
     const file = this.bucket.file(filePath);
     
@@ -76,13 +82,16 @@ class ContentStorage {
   async getContent(filePath) {
     console.log('[STORAGE] Attempting to retrieve content:', filePath);
     
+    if (!this.bucket) {
+      throw new Error('Storage service not initialized');
+    }
+
     try {
       const file = this.bucket.file(filePath);
       
       // Check if file exists before attempting download
       const [exists] = await file.exists();
       if (!exists) {
-        console.error('[STORAGE] File not found:', filePath);
         throw new Error(`File not found: ${filePath}`);
       }
 

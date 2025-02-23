@@ -18,9 +18,12 @@ RUN npm ci --only=production
 # Copy source code
 COPY . ./
 
-# Create non-root user
+# Create non-root user and set up directories
 RUN addgroup --system --gid 1001 nodejs \
-    && adduser --system --uid 1001 nodejs
+    && adduser --system --uid 1001 nodejs \
+    && mkdir -p /usr/src/app/content \
+    && chown -R nodejs:nodejs /usr/src/app/content
+
 USER nodejs
 
 EXPOSE 8080
