@@ -31,12 +31,15 @@ class SerpService {
       }
 
       console.log('[SERP] Fetching SERP data for keyword:', keyword);
-      
-      const response = await axios.post(this.apiUrl, {
-        search_question: keyword,
-        search_country: 'en-US',
-        volume
-      }, {
+
+      const response = await axios({
+        method: 'post',
+        url: this.apiUrl,
+        data: {
+          search_question: keyword,
+          search_country: 'en-US',
+          volume
+        },
         headers: {
           'X-API-KEY': this.apiKey,
           'Content-Type': 'application/json'

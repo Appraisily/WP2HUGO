@@ -21,7 +21,6 @@ class PeopleAlsoAskService {
 
   async getQuestions(keyword) {
     try {
-      // Check cache first
       console.log('[PAA] Checking cache for keyword:', keyword);
       const cacheResult = await this.checkCache(keyword);
       
@@ -36,9 +35,7 @@ class PeopleAlsoAskService {
         params: {
           keyword,
           search_country: 'US',
-          search_language: 'en'
-        },
-        headers: {
+          search_language: 'en',
           'X-API-KEY': this.apiKey
         }
       });
