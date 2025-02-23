@@ -26,19 +26,27 @@ async function initialize() {
   const serviceStatus = {
     sheets: false,
     wordpress: false,
-    hugo: false
+    hugo: false,
     keyword: false
   };
 
   try {
-    [serviceStatus.sheets, serviceStatus.hugo, serviceStatus.keyword] = await Promise.all([
+    [
+      serviceStatus.sheets,
+      serviceStatus.wordpress,
+      serviceStatus.hugo,
+      serviceStatus.keyword
+    ] = await Promise.all([
       initializeService(sheetsService, 'Sheets'),
       initializeService(wordpressService, 'WordPress'),
       initializeService(hugoService, 'Hugo'),
       initializeService(keywordResearchService, 'Keyword Research')
     ]);
   } catch (error) {
-    console.error('[SERVER] Error initializing services:', error);
+    console.error('[SERVER] Error initializing services:', {
+      error: error.message,
+      stack: error.stack
+    });
   }
 
   // Set up routes
