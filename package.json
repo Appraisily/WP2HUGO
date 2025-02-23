@@ -7,6 +7,6 @@
     "googleapis": "^118.0.0",
     "turndown": "^7.2.0",
     "axios": "^1.6.7",
-    "openai": "^4.28.0",
+    "openai": "^4.28.0"
   }
 }
