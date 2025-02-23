@@ -1,10 +1,33 @@
 const openaiService = require('../openai.service');
 const contentStorage = require('../../utils/storage');
 const { createSlug } = require('../../utils/slug');
+const { getSecret } = require('../../utils/secrets');
+const { secretNames } = require('../../config');
 
 class ContentAnalyzerService {
+  constructor() {
+    this.isInitialized = false;
+  }
+
+  async initialize() {
+    try {
+      await openaiService.initialize();
+      this.isInitialized = true;
+      console.log('[ANALYZER] Service initialized successfully');
+      return true;
+    } catch (error) {
+      console.error('[ANALYZER] Service initialization failed:', error);
+      throw error;
+    }
+  }
+
   async analyzeKeyword(keyword, collectedData) {
     try {
+      if (!this.isInitialized) {
+        console.log('[ANALYZER] Service not initialized, initializing now...');
+        await this.initialize();
+      }
+
       console.log('[ANALYZER] Starting content analysis for:', keyword);
       
       // Get both the content analysis and valuation description

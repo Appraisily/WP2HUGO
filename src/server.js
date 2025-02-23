@@ -8,6 +8,7 @@ const keywordResearchService = require('./services/keyword-research.service');
 const paaService = require('./services/paa.service');
 const serpService = require('./services/serp.service');
 const perplexityService = require('./services/perplexity.service');
+const contentAnalyzerService = require('./services/hugo/content-analyzer.service');
 
 async function initializeService(service, name) {
   try {
@@ -39,6 +40,7 @@ async function initialize() {
     storage: false,
     sheets: false,
     hugo: false,
+    analyzer: false,
     keyword: false,
     paa: false,
     serp: false,
@@ -46,10 +48,11 @@ async function initialize() {
   };
 
   try {
-    [serviceStatus.storage, serviceStatus.sheets, serviceStatus.hugo, serviceStatus.keyword, serviceStatus.paa, serviceStatus.serp, serviceStatus.perplexity] = await Promise.all([
+    [serviceStatus.storage, serviceStatus.sheets, serviceStatus.hugo, serviceStatus.analyzer, serviceStatus.keyword, serviceStatus.paa, serviceStatus.serp, serviceStatus.perplexity] = await Promise.all([
       initializeService(contentStorage, 'Storage'),
       initializeService(sheetsService, 'Sheets'),
       initializeService(hugoService, 'Hugo'),
+      initializeService(contentAnalyzerService, 'Content Analyzer'),
       initializeService(keywordResearchService, 'Keyword Research'),
       initializeService(paaService, 'People Also Ask'),
       initializeService(serpService, 'SERP'),
@@ -81,6 +84,7 @@ async function initialize() {
         storage: serviceStatus.storage ? 'connected' : 'disconnected',
         sheets: serviceStatus.sheets ? 'connected' : 'disconnected',
         hugo: serviceStatus.hugo ? 'connected' : 'disconnected',
+        analyzer: serviceStatus.analyzer ? 'connected' : 'disconnected',
         keyword: serviceStatus.keyword ? 'connected' : 'disconnected',
         paa: serviceStatus.paa ? 'connected' : 'disconnected',
         serp: serviceStatus.serp ? 'connected' : 'disconnected',
