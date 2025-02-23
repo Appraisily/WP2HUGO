@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs').promises;
 const contentStorage = require('../utils/storage');
+const openaiService = require('./openai.service');
 
 class HugoService {
   constructor() {
@@ -23,14 +24,14 @@ class HugoService {
     try {
       console.log('[HUGO] Creating post for:', postData.metadata.keyword);
 
-      // Generate front matter
-      const frontMatter = this.generateFrontMatter(postData);
+      // Generate content with OpenAI
+      const content = await this.generateContent(postData.metadata.keyword);
 
-      // Convert HTML to Markdown
-      const markdown = await this.convertContent(postData.post.content);
+      // Generate front matter
+      const frontMatter = this.generateFrontMatter(content);
 
       // Combine front matter and content
-      const fullContent = `${frontMatter}\n\n${markdown}`;
+      const fullContent = `${frontMatter}\n\n${content.markdown}`;
 
       // Create the file
       const slug = this.createSlug(postData.metadata.keyword);
@@ -46,29 +47,44 @@ class HugoService {
     }
   }
 
-  generateFrontMatter(postData) {
-    const { post, metadata } = postData;
-    const date = new Date(metadata.processedDate || new Date());
+  generateFrontMatter(content) {
+    const date = new Date();
     
     return `---
-title: "${metadata.seoTitle || post.title}"
+title: "${content.title}"
 date: ${date.toISOString()}
 lastmod: ${new Date().toISOString()}
 draft: false
-description: "${this.cleanDescription(post.content)}"
-slug: "${this.createSlug(metadata.keyword)}"
-keywords: ["${metadata.keyword}"]
+description: "${content.description}"
+slug: "${content.slug}"
+keywords: ${JSON.stringify(content.keywords)}
 tags: ["antiques", "valuation"]
 categories: ["Antiques"]
 author: "Appraisily"
-image: "${post.mainImageUrl || ''}"
 ---`;
   }
 
-  async convertContent(html) {
-    // Use existing content service for conversion
-    const contentService = require('./content/content.service');
-    return contentService.convertToMarkdown(html, { enhance: true });
+  async generateContent(keyword) {
+    const messages = [
+      {
+        role: 'assistant',
+        content: `Create a detailed blog post about "${keyword}". Return ONLY valid JSON with this structure:
+{
+  "title": "SEO optimized title",
+  "description": "Meta description (150-160 chars)",
+  "slug": "url-friendly-slug",
+  "keywords": ["relevant", "keywords"],
+  "markdown": "Complete post content in markdown format"
+}`
+      }
+    ];
+
+    const completion = await openaiService.openai.createChatCompletion({
+      model: 'o3-mini',
+      messages
+    });
+
+    return JSON.parse(completion.data.choices[0].message.content);
   }
 
   createSlug(text) {
@@ -76,14 +92,6 @@ image: "${post.mainImageUrl || ''}"
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
-  }
-
-  cleanDescription(html) {
-    return html
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .substring(0, 157) + '...';
   }
 }
 

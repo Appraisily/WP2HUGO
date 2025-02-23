@@ -1,9 +1,9 @@
 const { port } = require('./config');
 const express = require('express');
 const sheetsService = require('./services/sheets.service');
-const keywordResearchService = require('./services/keyword-research.service');
-const wordpressService = require('./services/wordpress');
 const hugoService = require('./services/hugo.service');
+const hugoProcessor = require('./services/hugo-processor.service');
+const keywordResearchService = require('./services/keyword-research.service');
 
 async function initializeService(service, name) {
   try {
@@ -22,31 +22,20 @@ async function initialize() {
   const app = express();
   app.use(express.json());
   
-  // Initialize services in parallel for better performance
   const serviceStatus = {
     sheets: false,
-    wordpress: false,
     hugo: false,
     keyword: false
   };
 
   try {
-    [
-      serviceStatus.sheets,
-      serviceStatus.wordpress,
-      serviceStatus.hugo,
-      serviceStatus.keyword
-    ] = await Promise.all([
+    [serviceStatus.sheets, serviceStatus.hugo, serviceStatus.keyword] = await Promise.all([
       initializeService(sheetsService, 'Sheets'),
-      initializeService(wordpressService, 'WordPress'),
       initializeService(hugoService, 'Hugo'),
       initializeService(keywordResearchService, 'Keyword Research')
     ]);
   } catch (error) {
-    console.error('[SERVER] Error initializing services:', {
-      error: error.message,
-      stack: error.stack
-    });
+    console.error('[SERVER] Error initializing services:', error);
   }
 
   // Set up routes
@@ -69,7 +58,6 @@ async function initialize() {
       status: 'ok',
       services: {
         sheets: serviceStatus.sheets ? 'connected' : 'disconnected',
-        wordpress: serviceStatus.wordpress ? 'connected' : 'disconnected',
         hugo: serviceStatus.hugo ? 'connected' : 'disconnected',
         keyword: serviceStatus.keyword ? 'connected' : 'disconnected'
       }
