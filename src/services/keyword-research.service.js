@@ -6,7 +6,6 @@ class KeywordResearchService {
   constructor() {
     this.apiUrl = 'https://keywordresearch.api.kwrds.ai/keywords-with-volumes';
     this.apiKey = null;
-    this.bucketName = 'hugo-posts-content';
   }
 
   async initialize() {

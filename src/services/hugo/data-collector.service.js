@@ -2,6 +2,7 @@ const contentStorage = require('../../utils/storage');
 const keywordResearchService = require('../keyword-research.service');
 const paaService = require('../paa.service');
 const serpService = require('../serp.service');
+const perplexityService = require('../perplexity.service');
 
 class DataCollectorService {
   async collectData(keyword, folderPath) {
@@ -17,10 +18,15 @@ class DataCollectorService {
     console.log('[HUGO] Fetching SERP data for:', keyword);
     const serpData = await this.getSerpData(keyword, keywordData.volume || 0, folderPath);
 
+    // Get Perplexity insights
+    console.log('[HUGO] Fetching Perplexity insights for:', keyword);
+    const perplexityData = await this.getPerplexityData(keyword, folderPath, serpData);
+
     return {
       keywordData,
       paaData,
-      serpData
+      serpData,
+      perplexityData
     };
   }
 
@@ -81,6 +87,44 @@ class DataCollectorService {
       data,
       { type: 'serp_data', keyword }
     );
+    return data;
+  }
+
+  async getPerplexityData(keyword, folderPath, serpData) {
+    try {
+      const existingData = await contentStorage.getContent(`${folderPath}/perplexity-data.json`);
+      if (existingData?.data) {
+        console.log('[HUGO] Using existing Perplexity data');
+        return existingData.data;
+      }
+    } catch (error) {
+      console.log('[HUGO] No existing Perplexity data, fetching fresh');
+    }
+
+    // Collect all Perplexity insights in parallel
+    const [variations, intent, context, topics, complement] = await Promise.all([
+      perplexityService.generateKeywordVariations(keyword),
+      perplexityService.analyzeSearchIntent(keyword),
+      perplexityService.getContextualExpansion(keyword),
+      perplexityService.generateContentTopics(keyword),
+      perplexityService.complementStructuredData(keyword, serpData)
+    ]);
+
+    const data = {
+      keyword_variations: variations,
+      search_intent: intent,
+      contextual_expansion: context,
+      content_topics: topics,
+      complementary_data: complement,
+      timestamp: new Date().toISOString()
+    };
+
+    await contentStorage.storeContent(
+      `${folderPath}/perplexity-data.json`,
+      data,
+      { type: 'perplexity_data', keyword }
+    );
+
     return data;
   }
 }

@@ -122,7 +122,8 @@ class WorkflowService {
         dataCollected: {
           hasKeywordData: Boolean(keywordData),
           hasPaaData: Boolean(paaData?.results?.length),
-          hasSerpData: Boolean(serpData?.serp?.length)
+          hasSerpData: Boolean(serpData?.serp?.length),
+          hasPerplexityData: Boolean(perplexityData)
         },
         success: true
       };

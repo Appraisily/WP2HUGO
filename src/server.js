@@ -7,6 +7,7 @@ const hugoProcessor = require('./services/hugo-processor.service');
 const keywordResearchService = require('./services/keyword-research.service');
 const paaService = require('./services/paa.service');
 const serpService = require('./services/serp.service');
+const perplexityService = require('./services/perplexity.service');
 
 async function initializeService(service, name) {
   try {
@@ -40,17 +41,19 @@ async function initialize() {
     hugo: false,
     keyword: false,
     paa: false,
-    serp: false
+    serp: false,
+    perplexity: false
   };
 
   try {
-    [serviceStatus.storage, serviceStatus.sheets, serviceStatus.hugo, serviceStatus.keyword, serviceStatus.paa, serviceStatus.serp] = await Promise.all([
+    [serviceStatus.storage, serviceStatus.sheets, serviceStatus.hugo, serviceStatus.keyword, serviceStatus.paa, serviceStatus.serp, serviceStatus.perplexity] = await Promise.all([
       initializeService(contentStorage, 'Storage'),
       initializeService(sheetsService, 'Sheets'),
       initializeService(hugoService, 'Hugo'),
       initializeService(keywordResearchService, 'Keyword Research'),
       initializeService(paaService, 'People Also Ask'),
-      initializeService(serpService, 'SERP')
+      initializeService(serpService, 'SERP'),
+      initializeService(perplexityService, 'Perplexity')
     ]);
   } catch (error) {
     console.error('[SERVER] Error initializing services:', error);
@@ -80,7 +83,8 @@ async function initialize() {
         hugo: serviceStatus.hugo ? 'connected' : 'disconnected',
         keyword: serviceStatus.keyword ? 'connected' : 'disconnected',
         paa: serviceStatus.paa ? 'connected' : 'disconnected',
-        serp: serviceStatus.serp ? 'connected' : 'disconnected'
+        serp: serviceStatus.serp ? 'connected' : 'disconnected',
+        perplexity: serviceStatus.perplexity ? 'connected' : 'disconnected'
       }
     });
   });
