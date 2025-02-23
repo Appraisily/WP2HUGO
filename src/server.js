@@ -3,9 +3,6 @@ const express = require('express');
 const sheetsService = require('./services/sheets.service');
 const wordpressService = require('./services/wordpress');
 const hugoService = require('./services/hugo.service');
-const HugoProcessorService = require('./services/hugo-processor.service');
-
-const hugoProcessor = new HugoProcessorService();
 
 async function initializeService(service, name) {
   try {
