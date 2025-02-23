@@ -1,5 +1,6 @@
 const openaiService = require('../openai.service');
 const contentStorage = require('../../utils/storage');
+const { createSlug } = require('../../utils/slug');
 
 class ContentAnalyzerService {
   async analyzeKeyword(keyword, collectedData) {
@@ -200,7 +201,7 @@ Remember: Return ONLY the 10-word description.`
   }
 
   async storeResults(keyword, analysis, valuationDesc, collectedData) {
-    const slug = this.createSlug(keyword);
+    const slug = createSlug(keyword);
     const timestamp = new Date().toISOString();
 
     await contentStorage.storeContent(
@@ -221,13 +222,6 @@ Remember: Return ONLY the 10-word description.`
       },
       { type: 'content_analysis', keyword }
     );
-  }
-
-  createSlug(text) {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
   }
 }
 

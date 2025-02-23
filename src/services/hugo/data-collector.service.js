@@ -3,10 +3,11 @@ const keywordResearchService = require('../keyword-research.service');
 const paaService = require('../paa.service');
 const serpService = require('../serp.service');
 const perplexityService = require('../perplexity.service');
+const { createSlug } = require('../../utils/slug');
 
 class DataCollectorService {
   async collectData(keyword, folderPath) {
-    const slug = this.createSlug(keyword);
+    const slug = createSlug(keyword);
     const keywordPath = `${slug}`;
 
     // Get keyword research data

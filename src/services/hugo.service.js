@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const contentStorage = require('../utils/storage');
 const openaiService = require('./openai.service');
+const { createSlug } = require('../utils/slug');
 
 class HugoService {
   constructor() {
@@ -44,7 +45,7 @@ class HugoService {
       const fullContent = `${frontMatter}\n\n${content.markdown}`;
 
       // Create the file
-      const slug = this.createSlug(postData.metadata.keyword);
+      const slug = createSlug(postData.metadata.keyword);
       const filePath = path.join(this.contentDir, `${slug}.md`);
       
       await fs.writeFile(filePath, fullContent, 'utf8');
@@ -95,13 +96,6 @@ author: "Appraisily"
     });
 
     return JSON.parse(completion.data.choices[0].message.content);
-  }
-
-  createSlug(text) {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
   }
 }
 

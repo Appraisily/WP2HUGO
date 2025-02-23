@@ -3,17 +3,11 @@ const sheetsService = require('../sheets.service');
 const dataCollector = require('./data-collector.service');
 const contentGenerator = require('./content-generator.service');
 const contentAnalyzer = require('./content-analyzer.service');
+const { createSlug } = require('../../utils/slug');
 
 class WorkflowService {
   constructor() {
     this.isProcessing = false;
-  }
-
-  createSlug(text) {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
   }
 
   async processWorkflow() {
@@ -95,7 +89,7 @@ class WorkflowService {
       console.log('[HUGO] Processing keyword:', keyword);
 
       // Create folder path
-      const slug = this.createSlug(keyword);
+      const slug = createSlug(keyword);
       const folderPath = `${slug}`;
 
       // Collect data
@@ -203,7 +197,7 @@ class WorkflowService {
 
       return {
         keyword,
-        slug: this.createSlug(keyword),
+        slug: createSlug(keyword),
         folderPath,
         dataCollected: {
           hasKeywordData: Boolean(collectedData.keywordData),
