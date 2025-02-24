@@ -5,77 +5,91 @@ This service automates the process of migrating WordPress posts to Hugo markdown
 
 ## Core Features
 
-### 1. Google Sheets Integration
-- Reads WordPress post IDs from a specified Google Sheet
-- Tracks processing status
-- Uses Google Cloud's workload identity for secure authentication
+### 1. AI-Powered Content Enhancement
+- OpenAI GPT-4 integration for content optimization
+- DALL-E 3 for image generation
+- Perplexity AI for research insights
+- Structured prompt management
+- Response tracking and analysis
 
-### 2. WordPress Integration
-- Fetches post content using WordPress REST API
-- Retrieves post metadata and featured images
-- Preserves SEO settings and taxonomies
-
-### 3. Hugo Content Generation
-- AI-enhanced content optimization using OpenAI
-- Intelligent content structure analysis
-- SEO-optimized front matter generation
-- Automated image handling and optimization
-- Preserves taxonomies and metadata
-- Implements schema.org markup
-
-### 4. AI Enhancement
-- OpenAI integration for content improvement
-- Prompt and response tracking in GCS
-- Automated content structure analysis
-- SEO optimization suggestions
-- Keyword research integration
-
-### 5. Content Analysis
-- Keyword research and analysis
-- SERP data collection
+### 2. Research & Analysis
+- Keyword research with volume metrics
 - "People Also Ask" question analysis
-- Perplexity AI insights
+- SERP data collection and analysis
 - Content structure recommendations
+- User intent analysis
+
+### 3. Content Pipeline
+- Modular processing stages
+- Event-driven architecture
+- Error recovery mechanisms
+- Progress tracking
+- Data versioning
+
+### 4. Storage & Caching
+- Google Cloud Storage integration
+- Multi-layer caching strategy
+- Data versioning
+- Structured storage hierarchy
+- Automatic cleanup
+
+### 5. Monitoring & Logging
+- Structured logging
+- Error tracking
+- Performance metrics
+- Request tracing
+- Health monitoring
 
 ## Architecture
 
 ### Project Structure
 ```
 src/
-├── controllers/           # Request handlers
-│   ├── content.controller.js
-│   └── worker.controller.js
-├── services/             # Core business logic
-│   ├── content/          # Content processing
-│   │   ├── content.service.js
-│   │   ├── generator.service.js
-│   │   ├── image.service.js
-│   │   └── structure.service.js
-│   ├── hugo/             # Hugo processing
-│   │   ├── content-analyzer.service.js
-│   │   ├── content-generator.service.js
-│   │   ├── data-collector.service.js
-│   │   └── workflow.service.js
-│   ├── openai.service.js # OpenAI integration
-│   ├── keyword-research.service.js
-│   ├── paa.service.js
-│   ├── perplexity.service.js
-│   └── serp.service.js
-├── utils/               # Utility functions
-│   ├── secrets.js
-│   ├── storage.js
-│   ├── sheets.js
-│   └── slug.js
-└── config/             # Configuration
-    └── index.js
+├── services/
+│   ├── ai/                    # AI services
+│   │   ├── base.js
+│   │   ├── content/
+│   │   │   ├── analyzer.js
+│   │   │   ├── enhancer.js
+│   │   │   └── generator.js
+│   │   ├── image/
+│   │   │   └── generator.js
+│   │   └── prompts/
+│   │       ├── content.js
+│   │       ├── image.js
+│   │       └── analysis.js
+│   ├── storage/              # Storage services
+│   │   ├── base.js
+│   │   ├── content/
+│   │   ├── research/
+│   │   └── ai/
+│   ├── research/            # Research services
+│   │   ├── base.js
+│   │   ├── keyword/
+│   │   ├── paa/
+│   │   ├── serp/
+│   │   └── perplexity/
+│   └── content/             # Content pipeline
+│       └── pipeline/
+│           ├── collector.js
+│           ├── analyzer.js
+│           ├── enhancer.js
+│           └── publisher.js
+├── utils/                   # Utilities
+│   ├── errors/
+│   ├── logging/
+│   └── monitoring/
+└── middleware/             # Express middleware
+    ├── error-handler.js
+    └── request-logger.js
 ```
 
 ## API Endpoints
 
 ### Content Processing
 ```bash
-# Process WordPress posts with AI enhancement
-POST /api/hugo/process
+# Process content with AI enhancement
+POST /api/content/process
 
 # Health check endpoint
 GET /health
@@ -86,15 +100,15 @@ GET /health
 ### Cloud Run Configuration
 - Memory: 1GB per instance
 - CPU: 1 core per instance
-- Auto-scaling: 1-10 instances based on load
+- Auto-scaling: 1-10 instances
 - Region: us-central1
 - Platform: managed
 - Authentication: public access
 
 ### CI/CD Pipeline
 - GitHub Actions with Workload Identity Federation
-- Cloud Build for manual deployments
-- Zero-downtime rolling updates
+- Cloud Build configuration
+- Zero-downtime deployments
 - Automated security scanning
 
 ## Configuration
@@ -147,62 +161,53 @@ Returns:
   "status": "ok",
   "services": {
     "storage": "connected",
-    "sheets": "connected",
-    "hugo": "connected",
-    "analyzer": "connected",
-    "keyword": "connected",
-    "paa": "connected",
-    "serp": "connected",
-    "perplexity": "connected"
+    "ai": "connected",
+    "research": "connected",
+    "pipeline": "connected"
   }
 }
 ```
 
 ## Error Handling
-- Comprehensive error logging
-- Automatic retry mechanisms
-- Detailed error reporting
-- Error tracking in GCS
-- Service health monitoring
+- Centralized error handling
+- Custom error classes
+- Automatic error reporting
+- Structured error logging
+- Error recovery mechanisms
 
-## Storage
-Content and logs are stored in Google Cloud Storage:
+## Storage Structure
 ```
 hugo-posts-content/
+├── content/              # Processed content
+│   └── [keyword]/
+│       ├── research/
+│       ├── analysis/
+│       └── final/
+├── ai/                  # AI data
+│   ├── prompts/
+│   └── responses/
 ├── research/           # Research data
-│   ├── keyword-data/
-│   ├── paa-data/
-│   ├── serp-data/
-│   └── perplexity-data/
-├── prompts/           # OpenAI prompts
-│   └── YYYY-MM-DD/
-├── responses/         # OpenAI responses
-│   └── YYYY-MM-DD/
-└── logs/             # System logs
-    └── YYYY-MM-DD/
-```
-
-## Hugo Content Structure
-```
-content/
-├── _index.md
-└── blog/
-    ├── _index.md
-    └── [slug].md
+│   ├── keyword/
+│   ├── paa/
+│   ├── serp/
+│   └── perplexity/
+└── logs/              # System logs
+    ├── errors/
+    ├── requests/
+    └── metrics/
 ```
 
 ## Limitations
 - API Rate Limits:
-  - WordPress REST API
   - OpenAI API
   - Keywords API
   - Perplexity API
-  - Google Sheets API
+  - WordPress API
 - Resource Constraints:
-  - Cloud Run memory (1GB)
-  - Cloud Run CPU (1 core)
+  - Memory usage (1GB)
+  - Processing time
   - Storage quotas
 - Content Limitations:
-  - Maximum content length for AI processing
-  - Image size restrictions
-  - Concurrent request limits
+  - Maximum content length
+  - Image generation limits
+  - Concurrent requests

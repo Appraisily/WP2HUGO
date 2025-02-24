@@ -4,6 +4,12 @@ const sheetsService = require('./services/sheets.service');
 const hugoService = require('./services/hugo.service');
 const contentStorage = require('./utils/storage');
 const hugoProcessor = require('./services/hugo-processor.service');
+const errorHandler = require('./middleware/error-handler');
+const requestLogger = require('./middleware/request-logger');
+const logger = require('./utils/logging');
+const monitoring = require('./utils/monitoring');
+
+const serverLogger = logger.createChild('server');
 const keywordResearchService = require('./services/keyword-research.service');
 const paaService = require('./services/paa.service');
 const serpService = require('./services/serp.service');
@@ -13,26 +19,27 @@ const contentAnalyzerService = require('./services/hugo/content-analyzer.service
 async function initializeService(service, name) {
   try {
     await service.initialize();
-    console.log(`[SERVER] ${name} service initialized successfully`);
+    serverLogger.info(`${name} service initialized successfully`);
     return true;
   } catch (error) {
-    console.error(`[SERVER] ${name} service failed to initialize:`, error);
+    serverLogger.error(`${name} service failed to initialize`, error);
     return false;
   }
 }
 
 async function initialize() {
-  console.log('[SERVER] Starting server initialization...');
+  serverLogger.info('Starting server initialization');
 
   const app = express();
   app.use(express.json());
+  app.use(requestLogger);
   
   // Initialize storage first as other services depend on it
   try {
     await contentStorage.initialize();
-    console.log('[SERVER] Storage service initialized successfully');
+    serverLogger.info('Storage service initialized successfully');
   } catch (error) {
-    console.error('[SERVER] Storage service failed to initialize:', error);
+    serverLogger.error('Storage service failed to initialize', error);
     throw error;
   }
 
@@ -78,6 +85,7 @@ async function initialize() {
 
   // Health check endpoint
   app.get('/health', (req, res) => {
+    monitoring.recordMetric('health_check', 1);
     res.json({
       status: 'ok',
       services: {
@@ -93,9 +101,12 @@ async function initialize() {
     });
   });
 
+  // Error handling middleware must be last
+  app.use(errorHandler);
+
   // Start server
   app.listen(port, () => {
-    console.log(`[SERVER] Server listening on port ${port}`);
+    serverLogger.info(`Server listening on port ${port}`);
   });
 
   return app;
@@ -103,6 +114,6 @@ async function initialize() {
 
 // Start the server
 initialize().catch(error => {
-  console.error('[SERVER] Failed to initialize server:', error);
+  serverLogger.error('Failed to initialize server', error);
   process.exit(1);
 });
