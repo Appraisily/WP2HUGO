@@ -1,41 +1,42 @@
-# WordPress to Hugo Content Migration Service
+# AI-Powered Hugo Content Generator
 
 ## Overview
-This service automates the process of migrating WordPress posts to Hugo markdown files, with a focus on SEO optimization and content enhancement. It reads WordPress post IDs from a Google Sheets document, retrieves content via the WordPress REST API, enhances it using AI, and converts it to Hugo-compatible markdown files with proper front matter.
+This service generates SEO-optimized Hugo pages from keywords. It reads keywords from a Google Sheet, performs comprehensive research and analysis using multiple AI services, and generates high-quality, optimized content with proper front matter and schema markup.
 
 ## Core Features
 
 ### 1. Google Sheets Integration
-- Reads WordPress post IDs from a specified Google Sheet
-- Tracks processing status
+- Reads keywords from specified Google Sheet
+- Tracks content generation status
 - Uses Google Cloud's workload identity for secure authentication
 
-### 2. WordPress Integration
-- Fetches post content using WordPress REST API
-- Retrieves post metadata and featured images
-- Preserves SEO settings and taxonomies
-
-### 3. Hugo Content Generation
-- AI-enhanced content optimization using OpenAI
-- Intelligent content structure analysis
-- SEO-optimized front matter generation
-- Automated image handling and optimization
-- Preserves taxonomies and metadata
-- Implements schema.org markup
-
-### 4. AI Enhancement
-- OpenAI integration for content improvement
-- Prompt and response tracking in GCS
+### 2. AI-Powered Content Generation
+- OpenAI GPT-4 for content creation
+- DALL-E 3 for image generation
+- Perplexity AI for research insights
 - Automated content structure analysis
-- SEO optimization suggestions
-- Keyword research integration
+- SEO optimization
 
-### 5. Content Analysis
+### 3. Research & Analysis
 - Keyword research and analysis
 - SERP data collection
 - "People Also Ask" question analysis
-- Perplexity AI insights
-- Content structure recommendations
+- Competitive content analysis
+- Topic clustering and semantic relevance
+
+### 4. Hugo Content Generation
+- SEO-optimized front matter
+- Schema.org markup
+- Automated image generation and optimization
+- Clean, semantic HTML structure
+- Proper content hierarchy
+
+### 5. Content Enhancement
+- Value proposition analysis
+- User intent matching
+- Conversion optimization
+- Trust signal integration
+- Featured snippet optimization
 
 ## Architecture
 
@@ -47,7 +48,6 @@ src/
 │   └── worker.controller.js
 ├── services/             # Core business logic
 │   ├── content/          # Content processing
-│   │   ├── content.service.js
 │   │   ├── generator.service.js
 │   │   ├── image.service.js
 │   │   └── structure.service.js
@@ -74,7 +74,7 @@ src/
 
 ### Content Processing
 ```bash
-# Process WordPress posts with AI enhancement
+# Generate Hugo content from keywords
 POST /api/hugo/process
 
 # Health check endpoint
@@ -112,9 +112,6 @@ GET /health
 | `OPEN_AI_API_SEO` | OpenAI API key |
 | `KWRDS_API_KEY` | Keywords API key |
 | `PERPLEXITY_API_KEY` | Perplexity API key |
-| `WORDPRESS_API_URL` | WordPress API endpoint |
-| `wp_username` | WordPress API username |
-| `wp_app_password` | WordPress API password |
 
 ## Development
 
@@ -126,7 +123,6 @@ GET /health
   - Secret Manager
   - Cloud Run
   - Workload Identity
-- WordPress site with REST API
 - OpenAI API access
 - Keywords API access
 - Perplexity API access
@@ -158,27 +154,54 @@ Returns:
 }
 ```
 
-## Error Handling
-- Comprehensive error logging
-- Automatic retry mechanisms
-- Detailed error reporting
-- Error tracking in GCS
-- Service health monitoring
+## Content Generation Process
 
-## Storage
-Content and logs are stored in Google Cloud Storage:
+1. Keyword Analysis
+   - Extract keyword from Google Sheet
+   - Perform keyword research
+   - Analyze search intent
+   - Collect SERP data
+   - Gather "People Also Ask" questions
+
+2. Content Research
+   - Generate topic clusters
+   - Analyze competition
+   - Identify content gaps
+   - Determine value propositions
+   - Plan content structure
+
+3. Content Creation
+   - Generate optimized title and meta description
+   - Create comprehensive content
+   - Generate and optimize images
+   - Add schema markup
+   - Implement proper heading hierarchy
+
+4. Quality Assurance
+   - Verify SEO optimization
+   - Check content accuracy
+   - Validate schema markup
+   - Ensure proper formatting
+   - Test internal links
+
+## Storage Structure
+Content and data are stored in Google Cloud Storage:
 ```
 hugo-posts-content/
-├── research/           # Research data
-│   ├── keyword-data/
-│   ├── paa-data/
-│   ├── serp-data/
-│   └── perplexity-data/
-├── prompts/           # OpenAI prompts
-│   └── YYYY-MM-DD/
-├── responses/         # OpenAI responses
-│   └── YYYY-MM-DD/
-└── logs/             # System logs
+├── {keyword-slug}/       # One folder per keyword
+│   ├── research/        # Research data
+│   │   ├── keyword-data.json
+│   │   ├── paa-data.json
+│   │   ├── serp-data.json
+│   │   └── perplexity-data.json
+│   ├── prompts/        # OpenAI prompts
+│   │   └── YYYY-MM-DD/
+│   ├── responses/      # OpenAI responses
+│   │   └── YYYY-MM-DD/
+│   └── content/        # Generated content
+│       ├── images/
+│       └── index.md
+└── logs/              # System logs
     └── YYYY-MM-DD/
 ```
 
@@ -188,12 +211,13 @@ content/
 ├── _index.md
 └── blog/
     ├── _index.md
-    └── [slug].md
+    └── {keyword-slug}/
+        ├── index.md
+        └── images/
 ```
 
 ## Limitations
 - API Rate Limits:
-  - WordPress REST API
   - OpenAI API
   - Keywords API
   - Perplexity API
@@ -204,5 +228,5 @@ content/
   - Storage quotas
 - Content Limitations:
   - Maximum content length for AI processing
-  - Image size restrictions
+  - Image generation quotas
   - Concurrent request limits
