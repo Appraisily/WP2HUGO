@@ -1,4 +1,4 @@
-const { enhancementService } = require('../openai/index');
+const { openaiService } = require('../openai/index');
 const wordpressService = require('../wordpress');
 const contentStorage = require('../../utils/storage');
 const TurndownService = require('turndown');
@@ -117,7 +117,8 @@ Return ONLY the enhanced markdown content with front matter.`
         }
       ];
 
-      const enhancedContent = await enhancementService.enhanceContent(markdown, keyword);
+      const response = await openaiService.chat(messages);
+      const enhancedContent = response.choices[0].message.content;
 
       return enhancedContent;
     } catch (error) {

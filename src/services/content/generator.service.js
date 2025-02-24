@@ -1,4 +1,4 @@
-const { contentService } = require('../openai/index');
+const { openaiService } = require('../openai/index');
 const contentStorage = require('../../utils/storage');
 
 class ContentGeneratorService {
@@ -76,7 +76,8 @@ IMPORTANT:
     );
 
     console.log('[CONTENT] Sending request to OpenAI');
-    const content = await contentService.analyzeContent(structure.keyword, { messages });
+    const response = await openaiService.chat(messages);
+    const content = JSON.parse(response.choices[0].message.content);
     
     // Process image sizes and formatting if needed
     if (images && images.length > 0 && content.content?.html) {

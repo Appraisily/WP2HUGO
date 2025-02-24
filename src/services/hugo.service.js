@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs').promises;
 const contentStorage = require('../utils/storage');
-const { contentService } = require('./openai/index');
+const { openaiService } = require('./openai/index');
 const { createSlug } = require('../utils/slug');
 
 class HugoService {
@@ -90,7 +90,8 @@ author: "Appraisily"
       }
     ];
 
-    const completion = await contentService.analyzeContent(keyword, { messages });
+    const response = await openaiService.chat(messages);
+    const completion = JSON.parse(response.choices[0].message.content);
 
     return completion;
   }

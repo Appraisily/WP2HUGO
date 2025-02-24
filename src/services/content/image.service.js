@@ -1,4 +1,4 @@
-const { imageService } = require('../openai/index');
+const { openaiService } = require('../openai/index');
 const wordpressService = require('../wordpress');
 const contentStorage = require('../../utils/storage');
 
@@ -10,7 +10,7 @@ class ContentImageService {
       try {
         // Generate image using DALL-E
         console.log('[CONTENT] Generating image:', imageReq.description);
-        const imageResult = await imageService.generateImage(imageReq.description);
+        const imageResult = await openaiService.generateImage(imageReq.description);
 
         // Upload to WordPress
         console.log('[CONTENT] Uploading image to WordPress');

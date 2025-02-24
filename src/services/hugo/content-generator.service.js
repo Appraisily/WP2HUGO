@@ -1,4 +1,4 @@
-const { contentService } = require('../openai/index');
+const { openaiService } = require('../openai/index');
 const contentStorage = require('../../utils/storage');
 
 class ContentGeneratorService {
@@ -38,7 +38,8 @@ Return ONLY valid JSON with this structure:
         }
       ];
 
-      const content = await contentService.analyzeContent(keyword, { messages });
+      const response = await openaiService.chat(messages);
+      const content = JSON.parse(response.choices[0].message.content);
       
       // Store the generated structure
       await contentStorage.storeContent(
