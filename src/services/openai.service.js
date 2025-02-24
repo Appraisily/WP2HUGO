@@ -1,6 +1,7 @@
 const OpenAI = require('openai');
 const { getSecret } = require('../utils/secrets');
 const { secretNames } = require('../config');
+const { createSlug } = require('../utils/slug');
 
 class OpenAIService {
   constructor() {
@@ -11,6 +12,11 @@ class OpenAIService {
     try {
       const apiKey = await getSecret(secretNames.openAiKey);
       this.openai = new OpenAI({ apiKey });
+      // Test the connection
+      await this.openai.chat.completions.create({
+        model: 'gpt-4-turbo-preview',
+        messages: [{ role: 'system', content: 'Test connection' }]
+      });
       this.isInitialized = true;
       console.log('[OPENAI] Successfully initialized');
     } catch (error) {
@@ -72,7 +78,7 @@ class OpenAIService {
       console.log(`[OPENAI] Sending request to enhance content (${version}) with keyword:`, keyword);
       
       // Use o1-mini for v3, gpt-4o for others
-      const model = version === 'v3' ? 'o1-mini' : 'gpt-4o';
+      const model = version === 'v3' ? 'gpt-4-turbo-preview' : 'gpt-4-turbo-preview';
       
       // Use 'assistant' role for o1-mini, 'system' for others
       const instructionRole = model === 'o1-mini' ? 'assistant' : 'system';
@@ -85,10 +91,13 @@ class OpenAIService {
         timestamp: new Date().toISOString()
       };
 
+      const slug = createSlug(keyword);
+      const dateFolder = new Date().toISOString().split('T')[0];
+
       await contentStorage.storeContent(
-        `prompts/${new Date().toISOString().split('T')[0]}/${model}-${Date.now()}.json`,
+        `${slug}/prompts/${dateFolder}/${model}-${Date.now()}.json`,
         promptData,
-        { type: 'openai_prompt', model }
+        { type: 'openai_prompt', model, keyword }
       );
       
       const completion = await this.openai.chat.completions.create({
@@ -114,9 +123,9 @@ class OpenAIService {
       };
 
       await contentStorage.storeContent(
-        `responses/${new Date().toISOString().split('T')[0]}/${model}-${Date.now()}.json`,
+        `${slug}/responses/${dateFolder}/${model}-${Date.now()}.json`,
         responseData,
-        { type: 'openai_response', model }
+        { type: 'openai_response', model, keyword }
       );
 
       const enhancedContent = completion.choices[0].message.content;

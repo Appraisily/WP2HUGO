@@ -161,7 +161,7 @@ CRITICAL REQUIREMENTS:
       ];
 
       const completion = await openaiService.openai.createChatCompletion({
-        model: 'o3-mini-high',
+        model: 'gpt-4-turbo-preview',
         messages,
         temperature: 0.5
       });
@@ -211,7 +211,7 @@ Remember: Return ONLY the 10-word description.`
       ];
 
       const completion = await openaiService.openai.createChatCompletion({
-        model: 'o3-mini-high',
+        model: 'gpt-4-turbo-preview',
         messages,
         temperature: 0.3
       });
