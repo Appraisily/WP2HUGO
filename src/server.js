@@ -1,18 +1,18 @@
 const { port } = require('./config');
 const express = require('express');
-const contentStorage = require('./services/storage/content/index');
+const contentStorage = require('./services/storage/content');
 const contentPipeline = require('./services/content/pipeline');
-const sheetsService = require('./services/sheets.service');
+const sheetsService = require('./services/research/sheets');
 const errorHandler = require('./middleware/error-handler');
 const requestLogger = require('./middleware/request-logger');
 const logger = require('./utils/logging');
 const monitoring = require('./utils/monitoring');
 
 const serverLogger = logger.createChild('server');
-const keywordResearchService = require('./services/research/keyword/index');
-const paaService = require('./services/research/paa/index');
-const serpService = require('./services/research/serp/index');
-const perplexityService = require('./services/research/perplexity/index');
+const keywordResearchService = require('./services/research/keyword');
+const paaService = require('./services/research/paa');
+const serpService = require('./services/research/serp');
+const perplexityService = require('./services/research/perplexity');
 const contentAnalyzerService = require('./services/ai/content/analyzer');
 
 async function initializeService(service, name) {
