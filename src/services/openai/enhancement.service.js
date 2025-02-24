@@ -3,76 +3,43 @@ const contentStorage = require('../../utils/storage');
 const { createSlug } = require('../../utils/slug');
 
 class EnhancementService extends BaseOpenAIService {
-  async enhanceContent(prompt, keyword, version = 'v1') {
-    this.checkInitialization();
-
+  async enhanceContent(content, keyword) {
     try {
-      console.log(`[OPENAI] Sending request to enhance content (${version}) with keyword:`, keyword);
-      
-      const model = 'o3-mini';
-      const instructionRole = 'assistant';
+      console.log('[OPENAI] Enhancing content for keyword:', keyword);
 
-      // Store the prompt
-      const promptData = {
-        model,
-        version,
-        keyword,
-        prompt,
-        timestamp: new Date().toISOString(),
-        role: 'assistant'  // Always use assistant role for o3-mini
-      };
+      const messages = [
+        {
+          role: 'assistant',
+          content: 'You are an expert content enhancer specializing in antiques and art valuation. Enhance the content while maintaining structure and adding compelling CTAs.'
+        },
+        {
+          role: 'user',
+          content: `Enhance this content for keyword "${keyword}":\n\n${content}`
+        }
+      ];
 
-      const slug = createSlug(keyword);
-      const dateFolder = new Date().toISOString().split('T')[0];
-
-      await contentStorage.storeContent(
-        `${slug}/prompts/${dateFolder}/${model}-${Date.now()}.json`,
-        promptData,
-        { type: 'openai_prompt', model, keyword }
-      );
-      
-      const completion = await this.openai.createChatCompletion({
-        model,
-        messages: [
-          {
-            role: instructionRole,
-            content: "You are an expert content enhancer specializing in antiques and art valuation. Your task is to enhance WordPress content while maintaining HTML structure and adding compelling CTAs. Return only the enhanced content with HTML formatting."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ]
+      const response = await this.makeRequest('/chat/completions', {
+        model: 'o3-mini',
+        messages
       });
 
-      // Store the response
-      const responseData = {
-        model,
-        completion,
-        timestamp: new Date().toISOString(),
-        prompt: promptData
-      };
+      const enhancedContent = response.choices[0].message.content;
 
+      // Store the enhancement data
+      const slug = createSlug(keyword);
       await contentStorage.storeContent(
-        `${slug}/responses/${dateFolder}/${model}-${Date.now()}.json`,
-        responseData,
-        { type: 'openai_response', model, keyword }
+        `${slug}/enhancements/${Date.now()}.json`,
+        {
+          original: content,
+          enhanced: enhancedContent,
+          timestamp: new Date().toISOString()
+        },
+        { type: 'content_enhancement', keyword }
       );
-
-      const enhancedContent = completion.choices[0].message.content;
-      
-      if (completion.choices[0].finish_reason === 'length') {
-        throw new Error(`Response truncated - content too long (${version})`);
-      }
 
       return enhancedContent;
     } catch (error) {
-      console.error(`[OPENAI] Error enhancing content (${version}):`, error);
-      
-      if (error.response?.data?.error?.code === 'context_length_exceeded') {
-        throw new Error(`Content too long for processing (${version})`);
-      }
-      
+      console.error('[OPENAI] Content enhancement failed:', error);
       throw error;
     }
   }

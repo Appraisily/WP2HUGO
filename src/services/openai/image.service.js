@@ -2,12 +2,10 @@ const BaseOpenAIService = require('./base.service');
 
 class ImageGenerationService extends BaseOpenAIService {
   async generateImage(prompt, size = "1024x1024") {
-    this.checkInitialization();
-
     try {
       console.log('[OPENAI] Generating image with prompt:', prompt);
       
-      const response = await this.openai.createImage({
+      const response = await this.makeRequest('/images/generations', {
         model: 'dall-e-3',
         prompt,
         n: 1,
@@ -16,7 +14,7 @@ class ImageGenerationService extends BaseOpenAIService {
         response_format: 'url'
       });
 
-      if (!response.data || !response.data[0] || !response.data[0].url) {
+      if (!response.data?.[0]?.url) {
         throw new Error('Invalid response from DALL-E 3');
       }
 
@@ -28,17 +26,8 @@ class ImageGenerationService extends BaseOpenAIService {
         url: imageUrl
       };
     } catch (error) {
-      console.error('[OPENAI] Error generating image:', error);
-      
-      if (error.response) {
-        console.error('[OPENAI] API error details:', {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data
-        });
-      }
-
-      throw new Error(`Failed to generate image: ${error.message}`);
+      console.error('[OPENAI] Image generation failed:', error);
+      throw error;
     }
   }
 }
