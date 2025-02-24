@@ -1,7 +1,8 @@
-const { getSecret } = require('../../utils/secrets');
-const { secretNames } = require('../../config');
-const contentStorage = require('../../utils/storage');
-const { createSlug } = require('../../utils/slug');
+const { getSecret } = require('../../../utils/secrets');
+const { secretNames } = require('../../../config');
+const contentStorage = require('../../storage/ai');
+const { createSlug } = require('../../../utils/slug');
+const { OpenAI } = require('openai');
 
 class BaseAIService {
   constructor() {
@@ -36,7 +37,7 @@ class BaseAIService {
       timestamp: new Date().toISOString()
     };
 
-    await contentStorage.storeContent(
+    await contentStorage.storePrompt(
       `${slug}/prompts/${dateFolder}/${type}-${Date.now()}.json`,
       promptData,
       { type: 'ai_prompt', model, keyword }
@@ -57,7 +58,7 @@ class BaseAIService {
       timestamp: new Date().toISOString()
     };
 
-    await contentStorage.storeContent(
+    await contentStorage.storeResponse(
       `${slug}/responses/${dateFolder}/${type}-${Date.now()}.json`,
       responseData,
       { type: 'ai_response', model, keyword }
@@ -87,7 +88,7 @@ class BaseAIService {
       timestamp: new Date().toISOString()
     };
 
-    await contentStorage.storeContent(
+    await contentStorage.storeError(
       `errors/${new Date().toISOString().split('T')[0]}/${Date.now()}.json`,
       errorData,
       { type: 'ai_error', ...context }
