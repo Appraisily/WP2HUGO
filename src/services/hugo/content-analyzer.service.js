@@ -1,4 +1,4 @@
-const { contentService } = require('../openai/index');
+const { contentService, initializeServices } = require('../openai/index');
 const contentStorage = require('../../utils/storage');
 const { createSlug } = require('../../utils/slug');
 const { getSecret } = require('../../utils/secrets');
@@ -11,7 +11,7 @@ class ContentAnalyzerService {
 
   async initialize() {
     try {
-      await contentService.initialize();
+      await initializeServices();
       this.isInitialized = true;
       console.log('[ANALYZER] Service initialized successfully');
       return true;

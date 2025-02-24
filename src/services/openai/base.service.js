@@ -11,12 +11,9 @@ class BaseOpenAIService {
   async initialize() {
     try {
       this.apiKey = await getSecret(secretNames.openAiKey);
-      
-      // Test the connection with a minimal request
-      await this.chat([{ role: 'assistant', content: 'Test connection' }]);
-
       this.isInitialized = true;
       console.log('[OPENAI] Successfully initialized');
+      return true;
     } catch (error) {
       console.error('[OPENAI] Initialization failed:', error);
       throw error;
