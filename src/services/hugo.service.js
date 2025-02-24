@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs').promises;
 const contentStorage = require('../utils/storage');
-const openaiService = require('./openai.service');
+const { contentService } = require('./openai');
 const { createSlug } = require('../utils/slug');
 
 class HugoService {
@@ -90,12 +90,9 @@ author: "Appraisily"
       }
     ];
 
-    const completion = await openaiService.openai.createChatCompletion({
-      model: 'o3-mini',
-      messages
-    });
+    const completion = await contentService.analyzeContent(keyword, { messages });
 
-    return JSON.parse(completion.data.choices[0].message.content);
+    return completion;
   }
 }
 
