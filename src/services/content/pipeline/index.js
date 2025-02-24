@@ -27,11 +27,22 @@ class ContentPipeline {
   }
 
   async process(keyword) {
+    if (!keyword) {
+      throw new Error('Keyword is required for content pipeline');
+    }
+
     console.log('[PIPELINE] Starting content pipeline for:', keyword);
 
     let data = { keyword };
     
     try {
+      // Check if we already have processed content
+      const existingContent = await contentStorage.getLatestContent(keyword);
+      if (existingContent) {
+        console.log('[PIPELINE] Found existing content for:', keyword);
+        return existingContent;
+      }
+
       for (const stage of this.stages) {
         data = await stage.process(data);
       }

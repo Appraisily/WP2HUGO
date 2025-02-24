@@ -2,6 +2,7 @@ const { port } = require('./config');
 const express = require('express');
 const contentStorage = require('./services/storage/content/index');
 const contentPipeline = require('./services/content/pipeline');
+const sheetsService = require('./services/sheets.service');
 const errorHandler = require('./middleware/error-handler');
 const requestLogger = require('./middleware/request-logger');
 const logger = require('./utils/logging');
@@ -68,7 +69,24 @@ async function initialize() {
   // Set up routes
   app.post('/api/content/process', async (req, res) => {
     try {
-      const result = await contentPipeline.process(req.body.keyword);
+      // Get keyword from sheets
+      const rows = await sheetsService.getAllRows();
+      if (!rows || rows.length === 0) {
+        return res.json({
+          success: false,
+          message: 'No keywords found in sheet'
+        });
+      }
+
+      const keyword = rows[0]['KWs'];
+      if (!keyword) {
+        return res.json({
+          success: false,
+          message: 'No keyword found in first row'
+        });
+      }
+
+      const result = await contentPipeline.process(keyword);
       res.json(result);
     } catch (error) {
       console.error('[SERVER] Error processing content:', error);
