@@ -1,7 +1,7 @@
-const { getSecret } = require('../../../utils/secrets');
-const { secretNames } = require('../../../config');
-const contentStorage = require('../../storage/ai');
-const { createSlug } = require('../../../utils/slug');
+const { getSecret } = require('../../utils/secrets');
+const { secretNames } = require('../../config');
+const contentStorage = require('../storage/ai');
+const { createSlug } = require('../../utils/slug');
 const { OpenAI } = require('openai');
 
 class BaseAIService {
