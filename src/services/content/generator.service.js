@@ -76,106 +76,21 @@ IMPORTANT:
     );
 
     console.log('[CONTENT] Sending request to OpenAI');
-    const content = await contentService.analyzeContent(structure.keyword, { structure, images });
-
-
-    // Store raw content before parsing
-    await contentStorage.storeContent(
-      `seo/keywords/${structure.slug}/raw_content.json`,
-      {
-        original: rawContent,
-        timestamp: new Date().toISOString()
-      },
-      { type: 'raw_content' }
-    );
-
-    try {
-      // Enhanced cleaning of the response
-      let cleanedContent = rawContent
-        .replace(/^```json\s*/gm, '')  // Remove JSON code block markers at start
-        .replace(/```\s*$/gm, '')      // Remove code block markers at end
-        .replace(/^\s+|\s+$/g, '')     // Trim whitespace
-        .trim();
-
-      // Store cleaned content before parsing
-      await contentStorage.storeContent(
-        `seo/keywords/${structure.slug}/cleaned_content.json`,
-        {
-          cleaned: cleanedContent,
-          timestamp: new Date().toISOString()
-        },
-        { type: 'cleaned_content' }
-      );
-
-      // Ensure the content starts with { and ends with }
-      if (!cleanedContent.startsWith('{') || !cleanedContent.endsWith('}')) {
-        console.error('[CONTENT] Invalid JSON structure:', cleanedContent);
-        throw new Error('Invalid JSON structure');
-      }
-
-      console.log('[CONTENT] Attempting to parse cleaned content');
-      
-      // Try parsing the cleaned content
-      let parsedContent;
-      try {
-        parsedContent = JSON.parse(cleanedContent);
-      } catch (parseError) {
-        console.error('[CONTENT] Parse error:', parseError.message);
-        console.error('[CONTENT] Cleaned content:', cleanedContent);
-
-        // Store parse error details
-        await contentStorage.storeContent(
-          `seo/keywords/${structure.slug}/parse_error.json`,
-          {
-            error: parseError.message,
-            rawContent,
-            cleanedContent,
-            timestamp: new Date().toISOString()
-          },
-          { type: 'parse_error' }
-        );
-
-        throw parseError;
-      }
-
-      // Validate required fields
-      this.validateContent(parsedContent);
-
-      // Process image sizes and formatting
-      if (images && images.length > 0) {
-        parsedContent.content.html = this.processImageFormatting(parsedContent.content.html);
-      }
-
-      // Store successful parsed content
-      await contentStorage.storeContent(
-        `seo/keywords/${structure.slug}/parsed_content.json`,
-        parsedContent,
-        { type: 'parsed_content' }
-      );
-
-      return parsedContent;
-    } catch (error) {
-      console.error('[CONTENT] Error parsing content:', error);
-      console.error('[CONTENT] Raw content:', rawContent);
-
-      // Store complete error details
-      await contentStorage.storeContent(
-        `seo/keywords/${structure.slug}/parsing_error.json`,
-        {
-          error: {
-            message: error.message,
-            stack: error.stack,
-            type: error.constructor.name,
-            response: error.response?.data
-          },
-          rawContent,
-          timestamp: new Date().toISOString()
-        },
-        { type: 'parsing_error' }
-      );
-
-      throw error;
+    const content = await contentService.analyzeContent(structure.keyword, { messages });
+    
+    // Process image sizes and formatting if needed
+    if (images && images.length > 0 && content.content?.html) {
+      content.content.html = this.processImageFormatting(content.content.html);
     }
+    
+    // Store the generated content
+    await contentStorage.storeContent(
+      `seo/keywords/${structure.slug}/generated_content.json`,
+      content,
+      { type: 'generated_content' }
+    );
+    
+    return content;
   }
 
   processImageFormatting(html) {
@@ -184,33 +99,6 @@ IMPORTANT:
       /<img([^>]*)>/g,
       '<img$1 class="wp-image aligncenter" style="max-width: 800px; height: auto;">'
     );
-  }
-
-  validateContent(content) {
-    if (!content.title || typeof content.title !== 'string') {
-      throw new Error('Invalid content: missing or invalid title');
-    }
-
-    if (!content.content?.html || typeof content.content.html !== 'string') {
-      throw new Error('Invalid content: missing or invalid HTML content');
-    }
-    
-    if (!content.meta?.title || typeof content.meta.title !== 'string') {
-      throw new Error('Invalid content: missing or invalid meta title');
-    }
-  }
-
-  stripHtmlTags(html) {
-    return html.replace(/<[^>]*>/g, ' ')
-               .replace(/\s+/g, ' ')
-               .trim();
-  }
-
-  createSlug(title) {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
   }
 }
 
