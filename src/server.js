@@ -1,20 +1,18 @@
 const { port } = require('./config');
 const express = require('express');
-const sheetsService = require('./services/sheets.service');
-const hugoService = require('./services/hugo.service');
-const contentStorage = require('./utils/storage');
-const hugoProcessor = require('./services/hugo-processor.service');
+const contentStorage = require('./services/storage/content');
+const contentPipeline = require('./services/content/pipeline');
 const errorHandler = require('./middleware/error-handler');
 const requestLogger = require('./middleware/request-logger');
 const logger = require('./utils/logging');
 const monitoring = require('./utils/monitoring');
 
 const serverLogger = logger.createChild('server');
-const keywordResearchService = require('./services/keyword-research.service');
-const paaService = require('./services/paa.service');
-const serpService = require('./services/serp.service');
-const perplexityService = require('./services/perplexity.service');
-const contentAnalyzerService = require('./services/hugo/content-analyzer.service');
+const keywordResearchService = require('./services/research/keyword');
+const paaService = require('./services/research/paa');
+const serpService = require('./services/research/serp');
+const perplexityService = require('./services/research/perplexity');
+const contentAnalyzerService = require('./services/ai/content/analyzer');
 
 async function initializeService(service, name) {
   try {
@@ -45,8 +43,7 @@ async function initialize() {
 
   const serviceStatus = {
     storage: false,
-    sheets: false,
-    hugo: false,
+    pipeline: false,
     analyzer: false,
     keyword: false,
     paa: false,
@@ -55,10 +52,9 @@ async function initialize() {
   };
 
   try {
-    [serviceStatus.storage, serviceStatus.sheets, serviceStatus.hugo, serviceStatus.analyzer, serviceStatus.keyword, serviceStatus.paa, serviceStatus.serp, serviceStatus.perplexity] = await Promise.all([
+    [serviceStatus.storage, serviceStatus.pipeline, serviceStatus.analyzer, serviceStatus.keyword, serviceStatus.paa, serviceStatus.serp, serviceStatus.perplexity] = await Promise.all([
       initializeService(contentStorage, 'Storage'),
-      initializeService(sheetsService, 'Sheets'),
-      initializeService(hugoService, 'Hugo'),
+      initializeService(contentPipeline, 'Content Pipeline'),
       initializeService(contentAnalyzerService, 'Content Analyzer'),
       initializeService(keywordResearchService, 'Keyword Research'),
       initializeService(paaService, 'People Also Ask'),
@@ -70,12 +66,12 @@ async function initialize() {
   }
 
   // Set up routes
-  app.post('/api/hugo/process', async (req, res) => {
+  app.post('/api/content/process', async (req, res) => {
     try {
-      const result = await hugoProcessor.processWorkflow();
+      const result = await contentPipeline.process(req.body.keyword);
       res.json(result);
     } catch (error) {
-      console.error('[SERVER] Error processing Hugo workflow:', error);
+      console.error('[SERVER] Error processing content:', error);
       res.status(500).json({
         success: false,
         error: error.message
@@ -90,8 +86,7 @@ async function initialize() {
       status: 'ok',
       services: {
         storage: serviceStatus.storage ? 'connected' : 'disconnected',
-        sheets: serviceStatus.sheets ? 'connected' : 'disconnected',
-        hugo: serviceStatus.hugo ? 'connected' : 'disconnected',
+        pipeline: serviceStatus.pipeline ? 'connected' : 'disconnected',
         analyzer: serviceStatus.analyzer ? 'connected' : 'disconnected',
         keyword: serviceStatus.keyword ? 'connected' : 'disconnected',
         paa: serviceStatus.paa ? 'connected' : 'disconnected',
