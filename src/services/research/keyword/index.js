@@ -26,13 +26,19 @@ class KeywordResearchService extends BaseResearchService {
       await this.initialize();
     }
 
+    if (!keyword) {
+      throw new Error('Keyword is required for keyword research');
+    }
+
     try {
       // Check cache first
       const cached = await this.checkCache(keyword, 'keyword');
-      if (cached) {
+      if (cached?.data) {
+        console.log('[KEYWORD] Using cached data for:', keyword);
         return cached.data;
       }
 
+      this.logApiCall('keyword', keyword);
       const response = await axios.post(this.apiUrl, {
         search_question: keyword,
         search_country: 'en-US'
@@ -43,22 +49,31 @@ class KeywordResearchService extends BaseResearchService {
         }
       });
 
+      if (!response.data) {
+        throw new Error('Empty response from keyword research API');
+      }
+
       const result = {
         data: response.data,
         timestamp: new Date().toISOString(),
         metadata: {
           keyword,
-          hasVolume: Boolean(response.data.volume),
-          hasIntent: Boolean(response.data['search-intent'])
+          hasVolume: Boolean(response.data?.volume),
+          hasIntent: Boolean(response.data?.['search-intent']),
+          resultCount: Object.keys(response.data?.keyword || {}).length
         }
       };
 
       // Store result
       await this.storeResult(keyword, result, 'keyword');
 
+      console.log('[KEYWORD] Stored fresh data for:', keyword);
       return result.data;
     } catch (error) {
       console.error('[KEYWORD] Error fetching keyword data:', error);
+      if (error.response?.data) {
+        console.error('[KEYWORD] API error details:', error.response.data);
+      }
       throw error;
     }
   }

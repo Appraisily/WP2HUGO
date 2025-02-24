@@ -26,23 +26,32 @@ class PeopleAlsoAskService extends BaseResearchService {
       await this.initialize();
     }
 
+    if (!keyword) {
+      throw new Error('Keyword is required for PAA data retrieval');
+    }
+
     try {
       // Check cache first
       const cached = await this.checkCache(keyword, 'paa');
-      if (cached) {
+      if (cached?.data) {
+        console.log('[PAA] Using cached data for:', keyword);
         return cached.data;
       }
 
-      const response = await axios.get(this.apiUrl, {
-        params: {
-          keyword,
-          search_country: 'US',
-          search_language: 'en'
-        },
+      this.logApiCall('paa', keyword);
+      const response = await axios.post(this.apiUrl, {
+        search_question: keyword,
+        search_country: 'en-US'
+      }, {
         headers: {
-          'X-API-KEY': this.apiKey
+          'X-API-KEY': this.apiKey,
+          'Content-Type': 'application/json'
         }
       });
+
+      if (!response.data) {
+        throw new Error('Empty response from PAA API');
+      }
 
       const result = {
         data: response.data,
@@ -56,9 +65,13 @@ class PeopleAlsoAskService extends BaseResearchService {
       // Store result
       await this.storeResult(keyword, result, 'paa');
 
+      console.log('[PAA] Stored fresh data for:', keyword);
       return result.data;
     } catch (error) {
       console.error('[PAA] Error fetching PAA data:', error);
+      if (error.response?.data) {
+        console.error('[PAA] API error details:', error.response.data);
+      }
       throw error;
     }
   }

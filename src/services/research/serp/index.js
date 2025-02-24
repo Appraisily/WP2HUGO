@@ -29,20 +29,25 @@ class SerpService extends BaseResearchService {
     try {
       // Check cache first
       const cached = await this.checkCache(keyword, 'serp');
-      if (cached) {
+      if (cached?.data) {
+        console.log('[SERP] Using cached data for:', keyword);
         return cached.data;
       }
 
+      this.logApiCall('serp', keyword);
       const response = await axios.post(this.apiUrl, {
         search_question: keyword,
-        search_country: 'en-US',
-        volume
+        search_country: 'en-US'
       }, {
         headers: {
           'X-API-KEY': this.apiKey,
           'Content-Type': 'application/json'
         }
       });
+
+      if (!response.data) {
+        throw new Error('Empty response from SERP API');
+      }
 
       const result = {
         data: response.data,
@@ -58,9 +63,13 @@ class SerpService extends BaseResearchService {
       // Store result
       await this.storeResult(keyword, result, 'serp');
 
+      console.log('[SERP] Stored fresh data for:', keyword);
       return result.data;
     } catch (error) {
       console.error('[SERP] Error fetching SERP data:', error);
+      if (error.response?.data) {
+        console.error('[SERP] API error details:', error.response.data);
+      }
       throw error;
     }
   }

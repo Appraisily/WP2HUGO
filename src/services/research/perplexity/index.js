@@ -35,10 +35,12 @@ class PerplexityService extends BaseResearchService {
     try {
       // Check cache first
       const cached = await this.checkCache(prompt, type);
-      if (cached) {
+      if (cached?.data) {
+        console.log('[PERPLEXITY] Using cached data for type:', type);
         return cached.data;
       }
 
+      this.logApiCall(type, prompt);
       const response = await axios.post(
         this.apiUrl,
         {
@@ -80,6 +82,7 @@ class PerplexityService extends BaseResearchService {
       // Store result
       await this.storeResult(prompt, result, type);
 
+      console.log('[PERPLEXITY] Stored fresh data for type:', type);
       return result.data;
     } catch (error) {
       console.error('[PERPLEXITY] API request failed:', error);
