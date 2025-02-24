@@ -1,4 +1,4 @@
-const { enhancementService } = require('../openai');
+const { enhancementService } = require('../openai/index');
 const wordpressService = require('../wordpress');
 const contentStorage = require('../../utils/storage');
 const TurndownService = require('turndown');

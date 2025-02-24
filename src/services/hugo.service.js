@@ -1,7 +1,7 @@
 const path = require('path');
 const fs = require('fs').promises;
 const contentStorage = require('../utils/storage');
-const { contentService } = require('./openai');
+const { contentService } = require('./openai/index');
 const { createSlug } = require('../utils/slug');
 
 class HugoService {
