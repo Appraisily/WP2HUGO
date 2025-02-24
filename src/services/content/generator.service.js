@@ -1,4 +1,4 @@
-const openaiService = require('../openai.service');
+const { contentService } = require('../openai');
 const contentStorage = require('../../utils/storage');
 
 class ContentGeneratorService {
@@ -76,22 +76,8 @@ IMPORTANT:
     );
 
     console.log('[CONTENT] Sending request to OpenAI');
-    const completion = await openaiService.openai.createChatCompletion({
-      model: 'o3-mini',
-      messages
-    });
+    const content = await contentService.analyzeContent(structure.keyword, { structure, images });
 
-    // Store raw OpenAI response
-    await contentStorage.storeContent(
-      `seo/keywords/${structure.slug}/openai_response.json`,
-      {
-        response: completion.data,
-        timestamp: new Date().toISOString()
-      },
-      { type: 'openai_response' }
-    );
-
-    let rawContent = completion.data.choices[0].message.content;
 
     // Store raw content before parsing
     await contentStorage.storeContent(

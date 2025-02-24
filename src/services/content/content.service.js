@@ -1,4 +1,4 @@
-const openaiService = require('../openai.service');
+const { enhancementService } = require('../openai');
 const wordpressService = require('../wordpress');
 const contentStorage = require('../../utils/storage');
 const TurndownService = require('turndown');
@@ -86,7 +86,7 @@ class ContentService {
 
   async enhanceMarkdown(markdown) {
     try {
-      console.log('[CONTENT] Enhancing markdown with OpenAI');
+      console.log('[OPENAI] Enhancing markdown with OpenAI');
       
       const messages = [
         {
@@ -117,13 +117,9 @@ Return ONLY the enhanced markdown content with front matter.`
         }
       ];
 
-      const completion = await openaiService.openai.createChatCompletion({
-        model: 'o3-mini',
-        messages,
-        temperature: 0.7
-      });
+      const enhancedContent = await enhancementService.enhanceContent(markdown, keyword);
 
-      return completion.data.choices[0].message.content;
+      return enhancedContent;
     } catch (error) {
       console.error('[CONTENT] Error enhancing markdown:', error);
       // Return original markdown if enhancement fails
