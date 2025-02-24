@@ -16,11 +16,7 @@ class ContentService extends BaseOpenAIService {
         }
       ];
 
-      const response = await this.makeRequest('/chat/completions', {
-        model: 'o3-mini',
-        messages
-      });
-
+      const response = await this.chat(messages);
       return JSON.parse(response.choices[0].message.content);
     } catch (error) {
       console.error('[OPENAI] Content analysis failed:', error);
@@ -41,11 +37,7 @@ class ContentService extends BaseOpenAIService {
         }
       ];
 
-      const response = await this.makeRequest('/chat/completions', {
-        model: 'o3-mini',
-        messages
-      });
-
+      const response = await this.chat(messages);
       return response.choices[0].message.content.trim();
     } catch (error) {
       console.error('[OPENAI] Valuation description generation failed:', error);
@@ -53,5 +45,3 @@ class ContentService extends BaseOpenAIService {
     }
   }
 }
-
-module.exports = new ContentService();

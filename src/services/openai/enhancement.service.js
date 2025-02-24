@@ -18,11 +18,7 @@ class EnhancementService extends BaseOpenAIService {
         }
       ];
 
-      const response = await this.makeRequest('/chat/completions', {
-        model: 'o3-mini',
-        messages
-      });
-
+      const response = await this.chat(messages);
       const enhancedContent = response.choices[0].message.content;
 
       // Store the enhancement data
@@ -44,5 +40,3 @@ class EnhancementService extends BaseOpenAIService {
     }
   }
 }
-
-module.exports = new EnhancementService();
