@@ -1,11 +1,15 @@
-const openaiService = require('../openai.service');
+const { contentService } = require('../openai');
+const contentStorage = require('../../utils/storage');
 
 class ContentGeneratorService {
   async generateStructure(keyword, keywordData, paaData, serpData) {
-    const messages = [
-      {
-        role: 'assistant',
-        content: `Create a detailed content structure for a blog post about "${keyword}".
+    try {
+      console.log('[HUGO] Generating content structure for:', keyword);
+      
+      const messages = [
+        {
+          role: 'assistant',
+          content: `Create a detailed content structure for a blog post about "${keyword}".
 Use this keyword research data to optimize the content structure:
 ${JSON.stringify(keywordData, null, 2)}
 
@@ -31,22 +35,33 @@ Return ONLY valid JSON with this structure:
     "search_volume": number,
     "related_questions": ["questions", "from", "PAA", "data"]
   }}`
-      }
-    ];
+        }
+      ];
 
-    const completion = await openaiService.openai.createChatCompletion({
-      model: 'o3-mini',
-      messages
-    });
+      const content = await contentService.analyzeContent(keyword, { messages });
+      
+      // Store the generated structure
+      await contentStorage.storeContent(
+        `${keyword}/structure.json`,
+        content,
+        { type: 'content_structure', keyword }
+      );
 
-    return JSON.parse(completion.data.choices[0].message.content);
+      return content;
+    } catch (error) {
+      console.error('[HUGO] Error generating content structure:', error);
+      throw error;
+    }
   }
 
   async generateContent(structure) {
-    const messages = [
-      {
-        role: 'assistant',
-        content: `Create detailed blog post content based on this structure. 
+    try {
+      console.log('[HUGO] Generating content from structure');
+      
+      const messages = [
+        {
+          role: 'assistant',
+          content: `Create detailed blog post content based on this structure. 
 Return ONLY valid JSON with this structure:
 {
   "title": "Post title",
@@ -55,19 +70,27 @@ Return ONLY valid JSON with this structure:
     "description": "Meta description",
     "keywords": ["keywords"]
   }}`
-      },
-      {
-        role: 'user',
-        content: JSON.stringify(structure)
-      }
-    ];
+        },
+        {
+          role: 'user',
+          content: JSON.stringify(structure)
+        }
+      ];
 
-    const completion = await openaiService.openai.createChatCompletion({
-      model: 'o3-mini',
-      messages
-    });
+      const content = await contentService.analyzeContent(structure.keyword, { messages });
+      
+      // Store the generated content
+      await contentStorage.storeContent(
+        `${structure.keyword}/content.json`,
+        content,
+        { type: 'generated_content', keyword: structure.keyword }
+      );
 
-    return JSON.parse(completion.data.choices[0].message.content);
+      return content;
+    } catch (error) {
+      console.error('[HUGO] Error generating content:', error);
+      throw error;
+    }
   }
 }
 
