@@ -76,6 +76,20 @@ class OpenAIService {
       
       // Use 'assistant' role for o1-mini, 'system' for others
       const instructionRole = model === 'o1-mini' ? 'assistant' : 'system';
+
+      // Store the prompt in GCS
+      const promptData = {
+        model,
+        messages,
+        temperature: 0.7,
+        timestamp: new Date().toISOString()
+      };
+
+      await contentStorage.storeContent(
+        `prompts/${new Date().toISOString().split('T')[0]}/${model}-${Date.now()}.json`,
+        promptData,
+        { type: 'openai_prompt', model }
+      );
       
       const completion = await this.openai.chat.completions.create({
         model,
@@ -90,6 +104,20 @@ class OpenAIService {
           }
         ]
       });
+
+      // Store the response in GCS
+      const responseData = {
+        model,
+        completion,
+        timestamp: new Date().toISOString(),
+        prompt: promptData
+      };
+
+      await contentStorage.storeContent(
+        `responses/${new Date().toISOString().split('T')[0]}/${model}-${Date.now()}.json`,
+        responseData,
+        { type: 'openai_response', model }
+      );
 
       const enhancedContent = completion.choices[0].message.content;
       
