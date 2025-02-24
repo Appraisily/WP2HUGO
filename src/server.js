@@ -1,50 +1,45 @@
 const { port } = require('./config');
 const express = require('express');
-const contentStorage = require('./services/storage/content');
-const contentPipeline = require('./services/content/pipeline');
-const sheetsService = require('./services/research/sheets');
-const errorHandler = require('./middleware/error-handler');
-const requestLogger = require('./middleware/request-logger');
-const logger = require('./utils/logging');
-const monitoring = require('./utils/monitoring');
-
-const serverLogger = logger.createChild('server');
-const keywordResearchService = require('./services/research/keyword');
-const paaService = require('./services/research/paa');
-const serpService = require('./services/research/serp');
-const perplexityService = require('./services/research/perplexity');
-const contentAnalyzerService = require('./services/ai/content/analyzer');
+const sheetsService = require('./services/sheets.service');
+const hugoService = require('./services/hugo.service');
+const contentStorage = require('./utils/storage');
+const hugoProcessor = require('./services/hugo-processor.service');
+const keywordResearchService = require('./services/keyword-research.service');
+const paaService = require('./services/paa.service');
+const serpService = require('./services/serp.service');
+const perplexityService = require('./services/perplexity.service');
+const contentAnalyzerService = require('./services/hugo/content-analyzer.service');
 
 async function initializeService(service, name) {
   try {
     await service.initialize();
-    serverLogger.info(`${name} service initialized successfully`);
+    console.log(`[SERVER] ${name} service initialized successfully`);
     return true;
   } catch (error) {
-    serverLogger.error(`${name} service failed to initialize`, error);
+    console.error(`[SERVER] ${name} service failed to initialize:`, error);
     return false;
   }
 }
 
 async function initialize() {
-  serverLogger.info('Starting server initialization');
+  console.log('[SERVER] Starting server initialization...');
 
   const app = express();
   app.use(express.json());
-  app.use(requestLogger);
   
   // Initialize storage first as other services depend on it
   try {
     await contentStorage.initialize();
-    serverLogger.info('Storage service initialized successfully');
+    console.log('[SERVER] Storage service initialized successfully');
   } catch (error) {
-    serverLogger.error('Storage service failed to initialize', error);
+    console.error('[SERVER] Storage service failed to initialize:', error);
     throw error;
   }
 
   const serviceStatus = {
     storage: false,
-    pipeline: false,
+    sheets: false,
+    hugo: false,
     analyzer: false,
     keyword: false,
     paa: false,
@@ -53,9 +48,10 @@ async function initialize() {
   };
 
   try {
-    [serviceStatus.storage, serviceStatus.pipeline, serviceStatus.analyzer, serviceStatus.keyword, serviceStatus.paa, serviceStatus.serp, serviceStatus.perplexity] = await Promise.all([
+    [serviceStatus.storage, serviceStatus.sheets, serviceStatus.hugo, serviceStatus.analyzer, serviceStatus.keyword, serviceStatus.paa, serviceStatus.serp, serviceStatus.perplexity] = await Promise.all([
       initializeService(contentStorage, 'Storage'),
-      initializeService(contentPipeline, 'Content Pipeline'),
+      initializeService(sheetsService, 'Sheets'),
+      initializeService(hugoService, 'Hugo'),
       initializeService(contentAnalyzerService, 'Content Analyzer'),
       initializeService(keywordResearchService, 'Keyword Research'),
       initializeService(paaService, 'People Also Ask'),
@@ -67,29 +63,12 @@ async function initialize() {
   }
 
   // Set up routes
-  app.post('/api/content/process', async (req, res) => {
+  app.post('/api/hugo/process', async (req, res) => {
     try {
-      // Get keyword from sheets
-      const rows = await sheetsService.getAllRows();
-      if (!rows || rows.length === 0) {
-        return res.json({
-          success: false,
-          message: 'No keywords found in sheet'
-        });
-      }
-
-      const keyword = rows[0]['KWs'];
-      if (!keyword) {
-        return res.json({
-          success: false,
-          message: 'No keyword found in first row'
-        });
-      }
-
-      const result = await contentPipeline.process(keyword);
+      const result = await hugoProcessor.processWorkflow();
       res.json(result);
     } catch (error) {
-      console.error('[SERVER] Error processing content:', error);
+      console.error('[SERVER] Error processing Hugo workflow:', error);
       res.status(500).json({
         success: false,
         error: error.message
@@ -99,12 +78,12 @@ async function initialize() {
 
   // Health check endpoint
   app.get('/health', (req, res) => {
-    monitoring.recordMetric('health_check', 1);
     res.json({
       status: 'ok',
       services: {
         storage: serviceStatus.storage ? 'connected' : 'disconnected',
-        pipeline: serviceStatus.pipeline ? 'connected' : 'disconnected',
+        sheets: serviceStatus.sheets ? 'connected' : 'disconnected',
+        hugo: serviceStatus.hugo ? 'connected' : 'disconnected',
         analyzer: serviceStatus.analyzer ? 'connected' : 'disconnected',
         keyword: serviceStatus.keyword ? 'connected' : 'disconnected',
         paa: serviceStatus.paa ? 'connected' : 'disconnected',
@@ -114,12 +93,9 @@ async function initialize() {
     });
   });
 
-  // Error handling middleware must be last
-  app.use(errorHandler);
-
   // Start server
   app.listen(port, () => {
-    serverLogger.info(`Server listening on port ${port}`);
+    console.log(`[SERVER] Server listening on port ${port}`);
   });
 
   return app;
@@ -127,6 +103,6 @@ async function initialize() {
 
 // Start the server
 initialize().catch(error => {
-  serverLogger.error('Failed to initialize server', error);
+  console.error('[SERVER] Failed to initialize server:', error);
   process.exit(1);
 });

@@ -1,11 +1,12 @@
 const { Storage } = require('@google-cloud/storage');
 
-class BaseStorageService {
-  constructor(bucketName) {
+class ContentStorage {
+  constructor() {
     this.storage = new Storage();
-    this.bucketName = bucketName;
+    this.bucketName = 'hugo-posts-content';
     this.isInitialized = false;
     this.bucket = null;
+    console.log('[STORAGE] Initializing storage service with bucket:', this.bucketName);
   }
 
   async initialize() {
@@ -24,7 +25,14 @@ class BaseStorageService {
     }
   }
 
-  async store(filePath, content, metadata = {}) {
+  async storeContent(filePath, content, metadata = {}) {
+    console.log('[STORAGE] Starting content storage process:', {
+      filePath,
+      contentSize: JSON.stringify(content).length,
+      metadata,
+      isInitialized: this.isInitialized
+    });
+
     if (!this.isInitialized || !this.bucket) {
       throw new Error('Storage not initialized');
     }
@@ -42,16 +50,24 @@ class BaseStorageService {
     };
 
     try {
+      console.log('[STORAGE] Attempting to save file with metadata:', fileMetadata);
       await file.save(JSON.stringify(content, null, 2), {
         metadata: fileMetadata,
         resumable: false
       });
+      
+      console.log('[STORAGE] Successfully stored content:', {
+        filePath,
+        timestamp: fileMetadata.metadata.timestamp
+      });
 
       // Verify the file was saved
       const [exists] = await file.exists();
-      if (!exists) {
-        throw new Error('File verification failed after save');
-      }
+      console.log('[STORAGE] File existence verification:', {
+        filePath,
+        exists,
+        size: (await file.getMetadata())[0].size
+      });
 
       return filePath;
     } catch (error) {
@@ -67,7 +83,9 @@ class BaseStorageService {
     }
   }
 
-  async get(filePath) {
+  async getContent(filePath) {
+    console.log('[STORAGE] Attempting to retrieve content:', filePath);
+    
     if (!this.bucket) {
       throw new Error('Storage service not initialized');
     }
@@ -75,13 +93,23 @@ class BaseStorageService {
     try {
       const file = this.bucket.file(filePath);
       
+      // Check if file exists before attempting download
       const [exists] = await file.exists();
       if (!exists) {
         throw new Error(`File not found: ${filePath}`);
       }
 
+      console.log('[STORAGE] File found, retrieving content...');
       const [content] = await file.download();
-      return JSON.parse(content.toString());
+      
+      const contentString = content.toString();
+      console.log('[STORAGE] Content retrieved successfully:', {
+        filePath,
+        contentSize: contentString.length,
+        isJson: this.isValidJson(contentString)
+      });
+
+      return JSON.parse(contentString);
     } catch (error) {
       console.error('[STORAGE] Error retrieving content:', {
         filePath,
@@ -95,43 +123,14 @@ class BaseStorageService {
     }
   }
 
-  async delete(filePath) {
-    if (!this.bucket) {
-      throw new Error('Storage service not initialized');
-    }
-
+  isValidJson(str) {
     try {
-      const file = this.bucket.file(filePath);
-      await file.delete();
+      JSON.parse(str);
       return true;
-    } catch (error) {
-      console.error('[STORAGE] Error deleting file:', {
-        filePath,
-        error: error.message
-      });
-      throw error;
-    }
-  }
-
-  async list(prefix) {
-    if (!this.bucket) {
-      throw new Error('Storage service not initialized');
-    }
-
-    try {
-      const [files] = await this.bucket.getFiles({ prefix });
-      return files.map(file => ({
-        name: file.name,
-        metadata: file.metadata
-      }));
-    } catch (error) {
-      console.error('[STORAGE] Error listing files:', {
-        prefix,
-        error: error.message
-      });
-      throw error;
+    } catch (e) {
+      return false;
     }
   }
 }
 
-module.exports = BaseStorageService;
+module.exports = new ContentStorage();
