@@ -5,7 +5,7 @@ class ImageGenerationService extends BaseOpenAIService {
     try {
       console.log('[OPENAI] Generating image with prompt:', prompt);
       
-      const response = await this.generateImage(prompt, size);
+      const response = await super.generateImage(prompt, size);
 
       if (!response.data?.[0]?.url) {
         throw new Error('Invalid response from DALL-E 3');

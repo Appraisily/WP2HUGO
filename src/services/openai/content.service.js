@@ -45,3 +45,5 @@ class ContentService extends BaseOpenAIService {
     }
   }
 }
+
+module.exports = new ContentService();

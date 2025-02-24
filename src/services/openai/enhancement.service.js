@@ -40,3 +40,5 @@ class EnhancementService extends BaseOpenAIService {
     }
   }
 }
+
+module.exports = new EnhancementService();
