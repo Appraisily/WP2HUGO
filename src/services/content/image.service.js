@@ -1,4 +1,3 @@
-const { openaiService } = require('../openai/index');
 const wordpressService = require('../wordpress');
 const contentStorage = require('../../utils/storage');
 
@@ -8,13 +7,17 @@ class ContentImageService {
 
     for (const imageReq of structure.images) {
       try {
-        // Generate image using DALL-E
-        console.log('[CONTENT] Generating image:', imageReq.description);
-        const imageResult = await openaiService.generateImage(imageReq.description);
-
+        // Generate a placeholder image URL instead of using DALL-E
+        console.log('[CONTENT] Using placeholder image for:', imageReq.description);
+        
+        // Create a placeholder image URL based on the image description
+        const placeholderSize = imageReq.type === 'featured' ? '1024x1024' : '800x600';
+        const encodedText = encodeURIComponent(imageReq.description.substring(0, 50));
+        const placeholderUrl = `https://via.placeholder.com/${placeholderSize}?text=${encodedText}`;
+        
         // Upload to WordPress
-        console.log('[CONTENT] Uploading image to WordPress');
-        const uploadResult = await wordpressService.uploadImage(imageResult.url);
+        console.log('[CONTENT] Uploading placeholder image to WordPress');
+        const uploadResult = await wordpressService.uploadImage(placeholderUrl);
 
         uploadedImages.push({
           ...imageReq,
