@@ -1,4 +1,5 @@
 const { openaiService, initialize } = require('../openai/index');
+const contentService = require('../openai/content.service');
 const contentStorage = require('../../utils/storage');
 const { createSlug } = require('../../utils/slug');
 const { getSecret } = require('../../utils/secrets');

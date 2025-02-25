@@ -1,4 +1,5 @@
 const { openaiService } = require('../openai/index');
+const contentService = require('../openai/content.service');
 const contentStorage = require('../../utils/storage');
 
 class ContentGeneratorService {

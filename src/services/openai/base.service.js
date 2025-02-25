@@ -1,16 +1,17 @@
-const axios = require('axios');
+const { OpenAI } = require('openai');
 const { getSecret } = require('../../utils/secrets');
 const { secretNames } = require('../../config');
 
 class BaseOpenAIService {
   constructor() {
     this.isInitialized = false;
-    this.baseURL = 'https://api.openai.com/v1';
+    this.client = null;
   }
 
   async initialize() {
     try {
-      this.apiKey = await getSecret(secretNames.openAiKey);
+      const apiKey = await getSecret(secretNames.openAiKey);
+      this.client = new OpenAI({ apiKey });
       this.isInitialized = true;
       console.log('[OPENAI] Successfully initialized');
       return true;
@@ -20,64 +21,43 @@ class BaseOpenAIService {
     }
   }
 
-  async chat(messages) {
+  async chat(messages, options = {}) {
     if (!this.isInitialized) {
       throw new Error('OpenAI service not initialized');
     }
 
     try {
-      const response = await axios({
-        method: 'POST',
-        url: `${this.baseURL}/chat/completions`,
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        data: {
-          model: 'o3-mini',
-          messages
-        }
+      const response = await this.client.chat.completions.create({
+        model: options.model || 'o3-mini',
+        messages,
+        ...options
       });
 
-      return response.data;
+      return response;
     } catch (error) {
-      console.error('[OPENAI] Chat completion failed:', {
-        status: error.response?.status,
-        data: error.response?.data
-      });
+      console.error('[OPENAI] Chat completion failed:', error);
       throw error;
     }
   }
 
-  async generateImage(prompt, size = "1024x1024") {
+  async generateImage(prompt, size = "1024x1024", quality = "standard") {
     if (!this.isInitialized) {
       throw new Error('OpenAI service not initialized');
     }
 
     try {
-      const response = await axios({
-        method: 'POST',
-        url: `${this.baseURL}/images/generations`,
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        data: {
-          model: 'dall-e-3',
-          prompt,
-          n: 1,
-          size,
-          quality: 'standard',
-          response_format: 'url'
-        }
+      const response = await this.client.images.generate({
+        model: 'dall-e-3',
+        prompt,
+        n: 1,
+        size,
+        quality,
+        response_format: 'url'
       });
 
-      return response.data;
+      return response;
     } catch (error) {
-      console.error('[OPENAI] Image generation failed:', {
-        status: error.response?.status,
-        data: error.response?.data
-      });
+      console.error('[OPENAI] Image generation failed:', error);
       throw error;
     }
   }
