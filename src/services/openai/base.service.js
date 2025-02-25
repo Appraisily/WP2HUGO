@@ -33,13 +33,26 @@ class BaseOpenAIService {
     }
 
     try {
-      // Use the chat completions endpoint
-      const response = await this.client.chat.completions.create({
-        model: options.model || 'o3-mini',
-        messages: messages,
-        temperature: options.temperature || 0.7,
-        max_tokens: options.max_tokens || 1000
-      });
+      // Use the chat completions endpoint with correct parameters for o3-mini model
+      const modelName = options.model || 'o3-mini';
+      
+      // Build request parameters based on model requirements
+      const requestParams = {
+        model: modelName,
+        messages: messages
+      };
+      
+      // Only add o3-mini specific parameters
+      if (modelName === 'o3-mini' && options.max_tokens) {
+        requestParams.max_completion_tokens = options.max_tokens;
+      } else if (modelName !== 'o3-mini') {
+        // For other models, use standard parameters
+        if (options.max_tokens) requestParams.max_tokens = options.max_tokens;
+        if (options.temperature) requestParams.temperature = options.temperature;
+      }
+      
+      // Send the request
+      const response = await this.client.chat.completions.create(requestParams);
 
       return response;
     } catch (error) {
