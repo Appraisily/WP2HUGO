@@ -1,3 +1,4 @@
+const axios = require('axios');
 const contentStorage = require('../../utils/storage');
 const sheetsService = require('../sheets.service');
 const dataCollector = require('./data-collector.service');
@@ -99,11 +100,14 @@ class WorkflowService {
       console.log('[HUGO] Analyzing collected data');
       const contentAnalysis = await contentAnalyzer.analyzeKeyword(keyword, collectedData);
 
+      // Variable to store valuation response
+      let valuationResponse = null;
+
       // Send valuation description to valuation agent if available
       if (contentAnalysis.valuation_description) {
         try {
           console.log('[HUGO] Sending to valuation agent:', contentAnalysis.valuation_description);
-          const valuationResponse = await axios.post(
+          valuationResponse = await axios.post(
             'https://valuer-agent-856401495068.us-central1.run.app/api/find-value-range',
             { text: contentAnalysis.valuation_description },
             { headers: { 'Content-Type': 'application/json' } }
