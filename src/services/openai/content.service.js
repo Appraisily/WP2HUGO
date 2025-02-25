@@ -25,7 +25,8 @@ class ContentService extends BaseOpenAIService {
       ];
 
       const response = await this.chat(messages);
-      return JSON.parse(response.choices[0].message.content);
+      const content = response.choices[0].message.content;
+      return JSON.parse(content);
     } catch (error) {
       console.error('[OPENAI] Content analysis failed:', error);
       throw error;

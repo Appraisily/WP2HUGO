@@ -1,4 +1,4 @@
-const { OpenAI } = require('openai');
+const OpenAI = require('openai');
 const { getSecret } = require('../../utils/secrets');
 const { secretNames } = require('../../config');
 
@@ -10,8 +10,14 @@ class BaseOpenAIService {
 
   async initialize() {
     try {
+      // Get the API key from Secret Manager
       const apiKey = await getSecret(secretNames.openAiKey);
-      this.client = new OpenAI({ apiKey });
+      
+      // Initialize the OpenAI client with the API key
+      this.client = new OpenAI({
+        apiKey: apiKey
+      });
+      
       this.isInitialized = true;
       console.log('[OPENAI] Successfully initialized');
       return true;
@@ -27,10 +33,12 @@ class BaseOpenAIService {
     }
 
     try {
+      // Use the chat completions endpoint
       const response = await this.client.chat.completions.create({
         model: options.model || 'o3-mini',
-        messages,
-        ...options
+        messages: messages,
+        temperature: options.temperature || 0.7,
+        max_tokens: options.max_tokens || 1000
       });
 
       return response;
@@ -46,12 +54,13 @@ class BaseOpenAIService {
     }
 
     try {
+      // Use the image generation endpoint
       const response = await this.client.images.generate({
         model: 'dall-e-3',
-        prompt,
+        prompt: prompt,
         n: 1,
-        size,
-        quality,
+        size: size,
+        quality: quality,
         response_format: 'url'
       });
 

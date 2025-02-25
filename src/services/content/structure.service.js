@@ -1,4 +1,4 @@
-const openaiService = require('../openai.service');
+const { openaiService } = require('../openai/index');
 const contentStorage = require('../../utils/storage');
 
 class ContentStructureService {
@@ -58,12 +58,9 @@ IMPORTANT:
       }
     ];
 
-    const completion = await openaiService.openai.createChatCompletion({
-      model: 'o3-mini',
-      messages
-    });
-
-    const structure = JSON.parse(completion.data.choices[0].message.content);
+    // Use the new OpenAI service
+    const response = await openaiService.chat(messages);
+    const structure = JSON.parse(response.choices[0].message.content);
 
     // Validate required images array
     if (!structure.images || !Array.isArray(structure.images)) {
