@@ -1,19 +1,13 @@
-const { openaiService, initialize } = require('../openai/index');
-const contentService = require('../openai/content.service');
 const contentStorage = require('../../utils/storage');
 const { createSlug } = require('../../utils/slug');
-const { getSecret } = require('../../utils/secrets');
-const { secretNames } = require('../../config');
 
 class ContentAnalyzerService {
   constructor() {
-    this.isInitialized = false;
+    this.isInitialized = true; // Always initialized
   }
 
   async initialize() {
     try {
-      await initialize();
-      this.isInitialized = true;
       console.log('[ANALYZER] Service initialized successfully');
       return true;
     } catch (error) {
@@ -24,11 +18,6 @@ class ContentAnalyzerService {
 
   async analyzeKeyword(keyword, collectedData) {
     try {
-      if (!this.isInitialized) {
-        console.log('[ANALYZER] Service not initialized, initializing now...');
-        await this.initialize();
-      }
-
       console.log('[ANALYZER] Starting content analysis for:', keyword);
       
       // Get both the content analysis and valuation description
@@ -53,7 +42,38 @@ class ContentAnalyzerService {
 
   async getContentAnalysis(keyword, collectedData) {
     try {
-      return await contentService.analyzeContent(keyword, collectedData);
+      // Return a static analysis object instead of calling OpenAI
+      return {
+        topic: keyword,
+        title: `Complete Guide to ${keyword}`,
+        sections: [
+          {
+            title: "Introduction",
+            content: `An introduction to ${keyword} and its importance in the market.`
+          },
+          {
+            title: "History and Background",
+            content: `The historical context of ${keyword} and how it has evolved over time.`
+          },
+          {
+            title: "Value Factors",
+            content: "Factors that contribute to the valuation of this item."
+          },
+          {
+            title: "Market Trends",
+            content: "Current market trends affecting value and desirability."
+          },
+          {
+            title: "Conclusion",
+            content: "Final thoughts and recommendations."
+          }
+        ],
+        meta: {
+          description: `Learn everything you need to know about ${keyword} including valuation, history, and market trends.`,
+          keywords: keyword.split(" "),
+          targetAudience: "Collectors and investors"
+        }
+      };
     } catch (error) {
       console.error('[ANALYZER] Error getting content analysis:', error);
       throw error;
@@ -63,7 +83,8 @@ class ContentAnalyzerService {
   async getValuationDescription(keyword, collectedData) {
     try {
       console.log('[ANALYZER] Generating valuation description for:', keyword);
-      return await contentService.generateValuationDescription(keyword, collectedData);
+      // Return a static valuation description
+      return `Valuable collectible with strong market appeal and historical significance.`;
     } catch (error) {
       console.error('[ANALYZER] Error generating valuation description:', error);
       throw error;
