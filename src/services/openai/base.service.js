@@ -23,7 +23,7 @@ class BaseOpenAIService {
 
   async chat(messages, options = {}) {
     if (!this.isInitialized) {
-      throw new Error('OpenAI service not initialized');
+      await this.initialize();
     }
 
     try {
@@ -42,7 +42,7 @@ class BaseOpenAIService {
 
   async generateImage(prompt, size = "1024x1024", quality = "standard") {
     if (!this.isInitialized) {
-      throw new Error('OpenAI service not initialized');
+      await this.initialize();
     }
 
     try {

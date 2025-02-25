@@ -3,8 +3,16 @@ const contentStorage = require('../../utils/storage');
 const { createSlug } = require('../../utils/slug');
 
 class ContentService extends BaseOpenAIService {
+  constructor() {
+    super(); // Make sure to call parent constructor
+  }
+
   async analyzeContent(keyword, collectedData) {
     try {
+      if (!this.isInitialized) {
+        await this.initialize();
+      }
+
       const messages = [
         {
           role: 'assistant',
@@ -26,6 +34,10 @@ class ContentService extends BaseOpenAIService {
 
   async generateValuationDescription(keyword, collectedData) {
     try {
+      if (!this.isInitialized) {
+        await this.initialize();
+      }
+
       const messages = [
         {
           role: 'assistant',
