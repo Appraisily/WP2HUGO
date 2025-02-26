@@ -9,6 +9,7 @@ const paaService = require('./services/paa.service');
 const serpService = require('./services/serp.service');
 const perplexityService = require('./services/perplexity.service');
 const contentAnalyzerService = require('./services/hugo/content-analyzer.service');
+const workflowService = require('./services/hugo/workflow.service');
 
 async function initializeService(service, name) {
   try {
@@ -69,6 +70,21 @@ async function initialize() {
       res.json(result);
     } catch (error) {
       console.error('[SERVER] Error processing Hugo workflow:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
+  // New endpoint for batch keyword processing
+  app.post('/api/keywords/process-batch', async (req, res) => {
+    try {
+      console.log('[SERVER] Starting batch keyword processing');
+      const result = await workflowService.processWorkflow();
+      res.json(result);
+    } catch (error) {
+      console.error('[SERVER] Error processing batch keywords:', error);
       res.status(500).json({
         success: false,
         error: error.message
