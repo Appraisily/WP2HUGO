@@ -1,232 +1,141 @@
-# AI-Powered Hugo Content Generator
+# WP2HUGO - WordPress to Hugo Converter (Local Version)
 
 ## Overview
-This service generates SEO-optimized Hugo pages from keywords. It reads keywords from a Google Sheet, performs comprehensive research and analysis using multiple AI services, and generates high-quality, optimized content with proper front matter and schema markup.
+This tool helps you generate SEO-optimized Hugo content from keywords. It processes a list of keywords through various research stages and generates structured blog post outlines with featured images.
 
-## Core Features
+## Features
+- Read keywords from a local file
+- Research keywords using KWRDS API
+- Get comprehensive information from Perplexity AI
+- Generate blog post structures using Google AI (Gemini Pro)
+- Generate featured images for each blog post using AI
+- Store all results locally for easy access
 
-### 1. Google Sheets Integration
-- Reads keywords from specified Google Sheet
-- Tracks content generation status
-- Uses Google Cloud's workload identity for secure authentication
-
-### 2. AI-Powered Content Generation
-- OpenAI GPT-4 for content creation
-- DALL-E 3 for image generation
-- Perplexity AI for research insights
-- Automated content structure analysis
-- SEO optimization
-
-### 3. Research & Analysis
-- Keyword research and analysis
-- SERP data collection
-- "People Also Ask" question analysis
-- Competitive content analysis
-- Topic clustering and semantic relevance
-
-### 4. Hugo Content Generation
-- SEO-optimized front matter
-- Schema.org markup
-- Automated image generation and optimization
-- Clean, semantic HTML structure
-- Proper content hierarchy
-
-### 5. Content Enhancement
-- Value proposition analysis
-- User intent matching
-- Conversion optimization
-- Trust signal integration
-- Featured snippet optimization
-
-## Architecture
-
-### Project Structure
+## Project Structure
 ```
-src/
-├── controllers/           # Request handlers
-│   ├── content.controller.js
-│   └── worker.controller.js
-├── services/             # Core business logic
-│   ├── content/          # Content processing
-│   │   ├── generator.service.js
-│   │   ├── image.service.js
-│   │   └── structure.service.js
-│   ├── hugo/             # Hugo processing
-│   │   ├── content-analyzer.service.js
-│   │   ├── content-generator.service.js
-│   │   ├── data-collector.service.js
-│   │   └── workflow.service.js
-│   ├── openai.service.js # OpenAI integration
-│   ├── keyword-research.service.js
-│   ├── paa.service.js
-│   ├── perplexity.service.js
-│   └── serp.service.js
-├── utils/               # Utility functions
-│   ├── secrets.js
-│   ├── storage.js
-│   ├── sheets.js
-│   └── slug.js
-└── config/             # Configuration
-    └── index.js
+├── src/                  # Source code
+│   ├── config/           # Configuration
+│   ├── services/         # Core services
+│   │   ├── keyword-research.service.js    # KWRDS API integration
+│   │   ├── perplexity.service.js          # Perplexity API integration
+│   │   ├── google-ai.service.js           # Google AI integration
+│   │   ├── image-generation.service.js    # Image generation integration
+│   │   └── workflow.service.js            # Main workflow coordination
+│   └── utils/            # Utility functions
+│       ├── local-storage.js     # Local file storage
+│       ├── keyword-reader.js    # Keyword file reader
+│       └── slugify.js           # String to slug converter
+├── process-keywords.js   # Main CLI script
+├── start-image-service.js # Script to start the image generation service
+├── keywords.txt          # List of keywords to process
+├── .env                  # Environment variables (API keys)
+├── image-generation-service/  # Image generation submodule
+└── output/               # Generated output (created on run)
+    ├── research/         # Raw research data
+    ├── content/          # Final content structures
+    └── images/           # Generated featured images
 ```
 
-## API Endpoints
-
-### Content Processing
-```bash
-# Generate Hugo content from keywords
-POST /api/hugo/process
-
-# Health check endpoint
-GET /health
-```
-
-## Deployment
-
-### Cloud Run Configuration
-- Memory: 1GB per instance
-- CPU: 1 core per instance
-- Auto-scaling: 1-10 instances based on load
-- Region: us-central1
-- Platform: managed
-- Authentication: public access
-
-### CI/CD Pipeline
-- GitHub Actions with Workload Identity Federation
-- Cloud Build for manual deployments
-- Zero-downtime rolling updates
-- Automated security scanning
-
-## Configuration
-
-### Environment Variables
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `PROJECT_ID` | Google Cloud project ID | Yes |
-| `PORT` | Server port (default: 8080) | No |
-
-### Required Secrets
-| Secret Name | Description |
-|-------------|-------------|
-| `SHEETS_ID_SEO` | Google Sheets document ID |
-| `OPEN_AI_API_SEO` | OpenAI API key |
-| `KWRDS_API_KEY` | Keywords API key |
-| `PERPLEXITY_API_KEY` | Perplexity API key |
-
-## Development
+## Setup Instructions
 
 ### Prerequisites
-- Node.js 18+
-- Google Cloud SDK
-- Access to:
-  - Google Cloud Storage
-  - Secret Manager
-  - Cloud Run
-  - Workload Identity
-- OpenAI API access
-- Keywords API access
-- Perplexity API access
+- Node.js 18+ installed
+- API keys for:
+  - KWRDS AI
+  - Perplexity AI
+  - Google AI (Gemini Pro)
+  - ImageKit (for image hosting, optional)
+  - OpenAI (for enhanced image prompts, optional)
 
-### Local Setup
-1. Clone the repository
-2. Install dependencies: `npm install`
+### Installation
+1. Clone the repository with submodules
+   ```
+   git clone https://github.com/yourusername/WP2HUGO.git
+   cd WP2HUGO
+   git submodule update --init --recursive
+   ```
+
+2. Install dependencies
+   ```
+   npm install
+   cd image-generation-service
+   npm install
+   cd ..
+   ```
+
 3. Set up environment variables
-4. Run locally: `npm start`
+   ```
+   cp .env.example .env
+   ```
+   Then edit `.env` and add your API keys
 
-### Health Check
-```bash
-GET /health
+4. Prepare keywords
+   The list of keywords is already in `keywords.txt`. You can edit this file to add or remove keywords as needed.
+
+### Usage
+
+#### Starting the Image Generation Service
+The image generation service needs to be running for image generation to work:
+
 ```
-Returns:
-```json
-{
-  "status": "ok",
-  "services": {
-    "storage": "connected",
-    "sheets": "connected",
-    "hugo": "connected",
-    "analyzer": "connected",
-    "keyword": "connected",
-    "paa": "connected",
-    "serp": "connected",
-    "perplexity": "connected"
-  }
-}
+npm run image-service
 ```
 
-## Content Generation Process
+#### Running the Full Process
+You can start both the image service and the main process with a single command:
 
-1. Keyword Analysis
-   - Extract keyword from Google Sheet
-   - Perform keyword research
-   - Analyze search intent
-   - Collect SERP data
-   - Gather "People Also Ask" questions
-
-2. Content Research
-   - Generate topic clusters
-   - Analyze competition
-   - Identify content gaps
-   - Determine value propositions
-   - Plan content structure
-
-3. Content Creation
-   - Generate optimized title and meta description
-   - Create comprehensive content
-   - Generate and optimize images
-   - Add schema markup
-   - Implement proper heading hierarchy
-
-4. Quality Assurance
-   - Verify SEO optimization
-   - Check content accuracy
-   - Validate schema markup
-   - Ensure proper formatting
-   - Test internal links
-
-## Storage Structure
-Content and data are stored in Google Cloud Storage:
 ```
-hugo-posts-content/
-├── {keyword-slug}/       # One folder per keyword
-│   ├── research/        # Research data
-│   │   ├── keyword-data.json
-│   │   ├── paa-data.json
-│   │   ├── serp-data.json
-│   │   └── perplexity-data.json
-│   ├── prompts/        # OpenAI prompts
-│   │   └── YYYY-MM-DD/
-│   ├── responses/      # OpenAI responses
-│   │   └── YYYY-MM-DD/
-│   └── content/        # Generated content
-│       ├── images/
-│       └── index.md
-└── logs/              # System logs
-    └── YYYY-MM-DD/
+npm run start:all
 ```
 
-## Hugo Content Structure
+Or run just the main process (if you don't need images or have the service running separately):
+
 ```
-content/
-├── _index.md
-└── blog/
-    ├── _index.md
-    └── {keyword-slug}/
-        ├── index.md
-        └── images/
+npm start
 ```
 
-## Limitations
-- API Rate Limits:
-  - OpenAI API
-  - Keywords API
-  - Perplexity API
-  - Google Sheets API
-- Resource Constraints:
-  - Cloud Run memory (1GB)
-  - Cloud Run CPU (1 core)
-  - Storage quotas
-- Content Limitations:
-  - Maximum content length for AI processing
-  - Image generation quotas
-  - Concurrent request limits
+#### Testing
+For testing, you can use:
+
+```
+npm run test:all   # Runs both the image service and test process
+npm test           # Runs just the test process
+npm run test:offline  # Runs offline testing without API calls
+```
+
+The script will:
+1. Read the keywords from `keywords.txt`
+2. For each keyword:
+   - Research using KWRDS API
+   - Get SERP data
+   - Find related keywords
+   - Query Perplexity for comprehensive information
+   - Generate a blog post structure using Google AI
+   - Generate a featured image for the blog post
+
+All results will be saved in the `output` directory:
+- `output/research/` - Raw research data
+- `output/content/` - Final content structures
+- `output/images/` - Generated images and metadata
+
+## API Keys
+
+You'll need to obtain the following API keys:
+
+1. **KWRDS API Key**: Register at [KWRDS.ai](https://kwrds.ai/)
+2. **Perplexity API Key**: Get from [Perplexity.ai](https://perplexity.ai/)
+3. **Google AI API Key**: Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
+4. **ImageKit API Keys**: Get from [ImageKit.io](https://imagekit.io/) (optional, for image hosting)
+5. **OpenAI API Key**: Get from [OpenAI](https://platform.openai.com/) (optional, for enhanced image prompts)
+
+Set these keys in your `.env` file.
+
+## Image Generation
+
+The project includes an image generation service that creates high-quality featured images for each blog post. The service uses:
+
+- AI-based image generation to create relevant images based on the blog post content
+- OpenAI GPT-4o for crafting detailed image prompts (if API key is provided)
+- ImageKit for image hosting and optimization (if API keys are provided)
+
+When API keys are not available, the service falls back to using placeholder images from [Picsum Photos](https://picsum.photos).

@@ -1,149 +1,170 @@
 const axios = require('axios');
-const { getSecret } = require('../utils/secrets');
-const contentStorage = require('../utils/storage');
+const path = require('path');
+const config = require('../config');
+const localStorage = require('../utils/local-storage');
+const slugify = require('../utils/slugify');
 
 class KeywordResearchService {
   constructor() {
-    this.apiUrl = 'https://keywordresearch.api.kwrds.ai/keywords-with-volumes';
+    this.initialized = false;
     this.apiKey = null;
+    this.baseUrl = 'https://api.kwrds.ai/v1';
   }
 
   async initialize() {
     try {
-      this.apiKey = await getSecret('KWRDS_API_KEY');
-      console.log('[KEYWORD] Service initialized successfully');
+      // Get API key from environment variable
+      this.apiKey = process.env.KWRDS_API_KEY;
+      
+      if (!this.apiKey) {
+        throw new Error('KWRDS API key not found. Please set the KWRDS_API_KEY environment variable.');
+      }
+      
+      console.log('[KEYWORD-RESEARCH] Service initialized successfully');
+      this.initialized = true;
       return true;
     } catch (error) {
-      console.error('[KEYWORD] Service initialization failed:', error);
+      console.error('[KEYWORD-RESEARCH] Failed to initialize keyword research service:', error);
       throw error;
     }
   }
 
-  async getKeywordData(keyword) {
+  /**
+   * Research a keyword using the KWRDS API
+   * @param {string} keyword - The keyword to research
+   * @returns {object} - The research data
+   */
+  async researchKeyword(keyword) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    
+    console.log(`[KEYWORD-RESEARCH] Researching keyword: "${keyword}"`);
+    
     try {
-      // Check if we have cached data
-      console.log('[KEYWORD] Checking cache for keyword:', keyword);
-      const cacheResult = await this.checkCache(keyword);
+      // Check if we already have this research data
+      const slug = slugify(keyword);
+      const filePath = path.join(config.paths.research, `${slug}-kwrds-data.json`);
       
-      if (cacheResult) {
-        console.log('[KEYWORD] Cache hit for keyword:', {
-          keyword,
-          dataAge: new Date() - new Date(cacheResult.timestamp),
-          dataSize: JSON.stringify(cacheResult.data).length
-        });
-        return cacheResult;
+      if (await localStorage.fileExists(filePath)) {
+        console.log(`[KEYWORD-RESEARCH] Using cached data for keyword: "${keyword}"`);
+        return await localStorage.readFile(filePath);
       }
-
-      console.log('[KEYWORD] Cache miss, fetching fresh data for:', keyword);
       
-      const startTime = Date.now();
-      const response = await axios.post(this.apiUrl, {
-        search_question: keyword,
-        search_country: 'en-US'
-      }, {
-        headers: {
-          'X-API-KEY': this.apiKey,
-          'Content-Type': 'application/json'
+      // Make API request
+      const response = await axios.post(
+        `${this.baseUrl}/keyword-data`, 
+        { keyword }, 
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          }
         }
-      });
-
-      const apiCallDuration = Date.now() - startTime;
-      console.log('[KEYWORD] API call completed:', {
-        keyword,
-        duration: apiCallDuration,
-        status: response.status,
-        dataSize: JSON.stringify(response.data).length
-      });
-
+      );
+      
       const data = response.data;
       
-      // Cache the result
-      console.log('[KEYWORD] Caching API response for:', keyword);
-      await this.cacheResult(keyword, data);
-
+      // Save research data
+      await localStorage.saveFile(filePath, data);
+      
       return data;
     } catch (error) {
-      console.error('[KEYWORD] Error fetching keyword data:', error);
+      console.error(`[KEYWORD-RESEARCH] Error researching keyword "${keyword}":`, error.response?.data || error.message);
       throw error;
     }
   }
 
-  async checkCache(keyword) {
+  /**
+   * Get related keywords for a keyword
+   * @param {string} keyword - The seed keyword
+   * @returns {array} - Array of related keywords
+   */
+  async getRelatedKeywords(keyword) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    
+    console.log(`[KEYWORD-RESEARCH] Getting related keywords for: "${keyword}"`);
+    
     try {
-      const slug = this.createSlug(keyword);
-      const filePath = `research/${slug}/keyword-data.json`;
+      // Check if we already have this data
+      const slug = slugify(keyword);
+      const filePath = path.join(config.paths.research, `${slug}-related-keywords.json`);
       
-      console.log('[KEYWORD] Checking cache file:', filePath);
-      
-      const content = await contentStorage.getContent(filePath);
-      
-      if (!content) {
-        console.log('[KEYWORD] No cache found for:', keyword);
-        return null;
+      if (await localStorage.fileExists(filePath)) {
+        console.log(`[KEYWORD-RESEARCH] Using cached related keywords for: "${keyword}"`);
+        return await localStorage.readFile(filePath);
       }
-
-      // Validate cache data structure
-      if (!content.data || !content.timestamp) {
-        console.warn('[KEYWORD] Invalid cache data structure for:', keyword);
-        return null;
-      }
-
-      return content;
+      
+      // Make API request
+      const response = await axios.post(
+        `${this.baseUrl}/related-keywords`, 
+        { keyword }, 
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          }
+        }
+      );
+      
+      const data = response.data;
+      
+      // Save research data
+      await localStorage.saveFile(filePath, data);
+      
+      return data;
     } catch (error) {
-      if (error.message.includes('File not found')) {
-        console.log('[KEYWORD] Cache file not found for:', keyword);
-      } else {
-        console.error('[KEYWORD] Cache check error:', {
-          keyword,
-          error: error.message,
-          stack: error.stack
-        });
-      }
-      return null;
+      console.error(`[KEYWORD-RESEARCH] Error getting related keywords for "${keyword}":`, error.response?.data || error.message);
+      throw error;
     }
   }
 
-  async cacheResult(keyword, data) {
-    const slug = this.createSlug(keyword);
-    const filePath = `research/${slug}/keyword-data.json`;
+  /**
+   * Get SERP data for a keyword
+   * @param {string} keyword - The keyword to get SERP data for
+   * @returns {object} - The SERP data
+   */
+  async getSerpData(keyword) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
     
-    const cacheData = {
-      keyword,
-      data,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        dataSize: JSON.stringify(data).length,
-        keywordLength: keyword.length,
-        hasVolume: Boolean(data.volume),
-        hasIntent: Boolean(data['search-intent'])
+    console.log(`[KEYWORD-RESEARCH] Getting SERP data for keyword: "${keyword}"`);
+    
+    try {
+      // Check if we already have this data
+      const slug = slugify(keyword);
+      const filePath = path.join(config.paths.research, `${slug}-serp-data.json`);
+      
+      if (await localStorage.fileExists(filePath)) {
+        console.log(`[KEYWORD-RESEARCH] Using cached SERP data for keyword: "${keyword}"`);
+        return await localStorage.readFile(filePath);
       }
-    };
-    
-    console.log('[KEYWORD] Saving cache file:', {
-      keyword,
-      filePath,
-      dataSize: JSON.stringify(cacheData).length
-    });
-
-    const savedPath = await contentStorage.storeContent(
-      filePath,
-      cacheData,
-      { type: 'keyword_research', keyword }
-    );
-
-    console.log('[KEYWORD] Cache file saved:', {
-      keyword,
-      path: savedPath
-    });
-
-    return savedPath;
-  }
-
-  createSlug(text) {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+      
+      // Make API request
+      const response = await axios.post(
+        `${this.baseUrl}/serp-data`, 
+        { keyword }, 
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`
+          }
+        }
+      );
+      
+      const data = response.data;
+      
+      // Save research data
+      await localStorage.saveFile(filePath, data);
+      
+      return data;
+    } catch (error) {
+      console.error(`[KEYWORD-RESEARCH] Error getting SERP data for "${keyword}":`, error.response?.data || error.message);
+      throw error;
+    }
   }
 }
 
