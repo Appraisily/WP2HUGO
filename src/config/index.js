@@ -12,6 +12,7 @@ const config = {
     research: path.join(OUTPUT_PATH, 'research'),
     content: path.join(OUTPUT_PATH, 'content'),
     images: path.join(OUTPUT_PATH, 'images'),
+    markdown: path.join(OUTPUT_PATH, 'markdown'),
   },
   
   // API configurations

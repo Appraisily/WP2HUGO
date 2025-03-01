@@ -10,7 +10,16 @@
     "image-service": "node start-image-service.js",
     "test:image": "node test-image-service.js",
     "start:all": "concurrently \"npm run image-service\" \"npm start\"",
-    "test:all": "concurrently \"npm run image-service\" \"npm test\""
+    "test:all": "concurrently \"npm run image-service\" \"npm test\"",
+    "markdown": "node generate-markdown.js",
+    "markdown:keyword": "node generate-markdown.js",
+    "test:markdown": "node test-markdown.js",
+    "export:hugo": "node export-to-hugo.js",
+    "test:full": "node full-process-test.js",
+    "optimize": "node optimize-content.js",
+    "plan": "node create-content-plan.js",
+    "plan:bulk": "node create-content-plan.js --bulk",
+    "plan:schedule": "node create-content-plan.js --schedule"
   },
   "dependencies": {
     "@google-cloud/secret-manager": "^4.1.3",

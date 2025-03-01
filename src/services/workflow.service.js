@@ -6,6 +6,7 @@ const keywordResearchService = require('./keyword-research.service');
 const perplexityService = require('./perplexity.service');
 const googleAiService = require('./google-ai.service');
 const imageGenerationService = require('./image-generation.service');
+const markdownGeneratorService = require('./markdown-generator.service');
 const slugify = require('../utils/slugify');
 const fs = require('fs').promises;
 
@@ -129,8 +130,12 @@ class WorkflowService {
       await imageGenerationService.initialize();
       const imageData = await imageGenerationService.generateImage(keyword, structureData);
       
-      // Compile results
-      const result = {
+      // Step 7: Generate SEO-optimized markdown content
+      console.log(`[WORKFLOW] Step 7: Generating SEO-optimized markdown for "${keyword}"`);
+      await markdownGeneratorService.initialize();
+      
+      // Compile intermediate results for markdown generation
+      const contentData = {
         keyword,
         slug,
         timestamp: new Date().toISOString(),
@@ -140,6 +145,14 @@ class WorkflowService {
         perplexityData,
         structureData,
         imageData
+      };
+      
+      const markdownData = await markdownGeneratorService.generateMarkdown(keyword, contentData);
+      
+      // Compile final results with all data
+      const result = {
+        ...contentData,
+        markdownData
       };
       
       // Save complete result
