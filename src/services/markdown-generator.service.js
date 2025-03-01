@@ -8,6 +8,8 @@ const fs = require('fs').promises;
 const config = require('../config');
 const localStorage = require('../utils/local-storage');
 const slugify = require('../utils/slugify');
+const internalLinkingService = require('./internal-linking.service');
+const schemaMarkupService = require('./schema-markup.service');
 
 class MarkdownGeneratorService {
   constructor() {

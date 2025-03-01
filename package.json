@@ -19,7 +19,18 @@
     "optimize": "node optimize-content.js",
     "plan": "node create-content-plan.js",
     "plan:bulk": "node create-content-plan.js --bulk",
-    "plan:schedule": "node create-content-plan.js --schedule"
+    "plan:schedule": "node create-content-plan.js --schedule",
+    "enhanced": "node enhanced-process.js",
+    "enhanced:keyword": "node enhanced-process.js",
+    "analyze:competitors": "node analyze-competitors.js",
+    "linking:update": "node update-internal-links.js",
+    "monitoring:report": "node generate-monitoring-report.js",
+    "monitoring:report:all": "node generate-monitoring-report.js --all",
+    "schema:generate": "node generate-schema.js",
+    "update:content": "node update-content.js",
+    "update:content:keyword": "node update-content.js --keyword",
+    "update:content:all": "node update-content.js --all",
+    "update:content:auto": "node update-content.js --auto"
   },
   "dependencies": {
     "@google-cloud/secret-manager": "^4.1.3",
@@ -30,6 +41,8 @@
     "turndown": "^7.2.0",
     "axios": "^1.6.7",
     "dotenv": "^16.4.5",
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "inquirer": "^8.2.5",
+    "openai": "^4.20.1"
   }
 }

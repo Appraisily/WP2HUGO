@@ -9,6 +9,10 @@ const imageGenerationService = require('./image-generation.service');
 const markdownGeneratorService = require('./markdown-generator.service');
 const slugify = require('../utils/slugify');
 const fs = require('fs').promises;
+const schemaMarkupService = require('./schema-markup.service');
+const competitorAnalysisService = require('./competitor-analysis.service');
+const internalLinkingService = require('./internal-linking.service');
+const contentMonitorService = require('./content-monitor.service');
 
 class WorkflowService {
   constructor() {
@@ -81,89 +85,133 @@ class WorkflowService {
   }
 
   /**
-   * Process a single keyword through the entire workflow
+   * Process a single keyword with enhanced SEO
    * @param {string} keyword - The keyword to process
-   * @returns {object} - The processing results
+   * @returns {Promise<object>} - The processed content
    */
   async processKeyword(keyword) {
     if (!this.initialized) {
       await this.initialize();
     }
-    
-    console.log(`[WORKFLOW] Starting processing of keyword: "${keyword}"`);
+
+    console.log(`[WORKFLOW] Processing keyword: "${keyword}"`);
     
     try {
       const slug = slugify(keyword);
-      const resultFilePath = path.join(config.paths.content, `${slug}-content.json`);
+      const cachePath = path.join(config.paths.content, `${slug}-content.json`);
       
-      // Check if already processed
-      if (await localStorage.fileExists(resultFilePath)) {
-        console.log(`[WORKFLOW] Keyword "${keyword}" already processed, using cached result`);
-        return await localStorage.readFile(resultFilePath);
+      // Check if content exists in cache
+      try {
+        const cacheExists = await fs.access(cachePath).then(() => true).catch(() => false);
+        if (cacheExists) {
+          console.log(`[WORKFLOW] Found cached content for "${keyword}"`);
+          const cachedContent = await fs.readFile(cachePath, 'utf8');
+          return JSON.parse(cachedContent);
+        }
+      } catch (error) {
+        // Cache doesn't exist or is invalid, proceed with processing
+      }
+
+      // 1. Get keyword research
+      console.log(`[WORKFLOW] Researching keyword: "${keyword}"`);
+      const researchData = await keywordResearchService.researchKeyword(keyword);
+      
+      // 2. Get comprehensive information from Perplexity
+      console.log(`[WORKFLOW] Getting comprehensive information for "${keyword}"`);
+      const perplexityData = await perplexityService.getComprehensiveInfo(keyword);
+      
+      // 3. NEW: Analyze top competitors to identify winning strategies
+      let competitorAnalysis = null;
+      if (researchData && researchData.serp && researchData.serp.results) {
+        console.log(`[WORKFLOW] Analyzing competitors for "${keyword}"`);
+        try {
+          competitorAnalysis = await competitorAnalysisService.analyzeCompetitors(keyword, researchData.serp.results);
+        } catch (error) {
+          console.error(`[WORKFLOW] Error analyzing competitors: ${error.message}`);
+        }
       }
       
-      // Step 1: Research keyword using KWRDS API
-      console.log(`[WORKFLOW] Step 1: Researching keyword "${keyword}"`);
-      await keywordResearchService.initialize();
-      const keywordData = await keywordResearchService.researchKeyword(keyword);
+      // 4. Generate blog post structure
+      console.log(`[WORKFLOW] Generating content structure for "${keyword}"`);
       
-      // Step 2: Get SERP data
-      console.log(`[WORKFLOW] Step 2: Getting SERP data for "${keyword}"`);
-      const serpData = await keywordResearchService.getSerpData(keyword);
+      // Include competitor insights in structure prompt if available
+      let additionalStructureInfo = '';
+      if (competitorAnalysis && competitorAnalysis.success) {
+        additionalStructureInfo = `
+Based on competitor analysis, consider these insights:
+- Average word count for top content: ${competitorAnalysis.insights.contentStatistics.averageWordCount} words
+- Important topics to cover: ${competitorAnalysis.insights.criticalTopics.join(', ')}
+- Content gaps to fill: ${competitorAnalysis.insights.contentGaps.join(', ')}
+- Recommended headings structure: ${competitorAnalysis.insights.recommendedOutline.join(', ')}
+`;
+      }
       
-      // Step 3: Get related keywords
-      console.log(`[WORKFLOW] Step 3: Getting related keywords for "${keyword}"`);
-      const relatedKeywords = await keywordResearchService.getRelatedKeywords(keyword);
+      const structureData = await googleAiService.generateContentStructure(
+        keyword, 
+        researchData, 
+        perplexityData,
+        additionalStructureInfo
+      );
       
-      // Step 4: Query Perplexity for comprehensive information
-      console.log(`[WORKFLOW] Step 4: Querying Perplexity for information about "${keyword}"`);
-      await perplexityService.initialize();
-      const perplexityData = await perplexityService.query(keyword);
-      
-      // Step 5: Generate blog post structure using Google AI
-      console.log(`[WORKFLOW] Step 5: Generating blog post structure using Google AI for "${keyword}"`);
-      await googleAiService.initialize();
-      const structureData = await googleAiService.generateStructure(keyword, keywordData, perplexityData, serpData);
-      
-      // Step 6: Generate featured image for the blog post
-      console.log(`[WORKFLOW] Step 6: Generating featured image for "${keyword}"`);
-      await imageGenerationService.initialize();
+      // 5. Generate image
+      console.log(`[WORKFLOW] Generating image for "${keyword}"`);
       const imageData = await imageGenerationService.generateImage(keyword, structureData);
       
-      // Step 7: Generate SEO-optimized markdown content
-      console.log(`[WORKFLOW] Step 7: Generating SEO-optimized markdown for "${keyword}"`);
-      await markdownGeneratorService.initialize();
-      
-      // Compile intermediate results for markdown generation
+      // 6. Compile final content
       const contentData = {
         keyword,
         slug,
-        timestamp: new Date().toISOString(),
-        keywordData,
-        serpData,
-        relatedKeywords,
+        title: structureData.title || `${keyword} - Comprehensive Guide`,
+        description: structureData.metaDescription || `Learn everything about ${keyword} in this comprehensive guide.`,
+        date: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        researchData,
         perplexityData,
-        structureData,
-        imageData
+        structure: structureData,
+        image: imageData,
+        competitorAnalysis: competitorAnalysis?.success ? competitorAnalysis.insights : null
       };
       
-      const markdownData = await markdownGeneratorService.generateMarkdown(keyword, contentData);
+      // 7. NEW: Generate appropriate schema markup based on content type
+      let contentType = 'article'; // Default type
+      if (structureData.contentType) {
+        contentType = structureData.contentType;
+      } else if (structureData.title && structureData.title.toLowerCase().includes('how to')) {
+        contentType = 'howto';
+      } else if (structureData.sections && structureData.sections.some(s => s.type === 'faq' || (s.title && s.title.toLowerCase().includes('faq')))) {
+        contentType = 'faq';
+      }
       
-      // Compile final results with all data
-      const result = {
-        ...contentData,
-        markdownData
-      };
+      console.log(`[WORKFLOW] Generating schema markup for "${keyword}" (${contentType})`);
+      try {
+        const schemaMarkup = await schemaMarkupService.generateSchemaMarkup(keyword, contentData, contentType);
+        contentData.schema = schemaMarkup;
+      } catch (error) {
+        console.error(`[WORKFLOW] Error generating schema markup: ${error.message}`);
+      }
       
-      // Save complete result
-      await localStorage.saveFile(resultFilePath, result);
+      // 8. NEW: Register content in the internal linking service
+      console.log(`[WORKFLOW] Registering "${keyword}" in content registry for internal linking`);
+      try {
+        await internalLinkingService.registerContent(keyword, contentData);
+      } catch (error) {
+        console.error(`[WORKFLOW] Error registering content for linking: ${error.message}`);
+      }
       
-      // Mark as processed
-      await this.markKeywordAsProcessed(keyword);
+      // 9. NEW: Register content for monitoring
+      console.log(`[WORKFLOW] Setting up content monitoring for "${keyword}"`);
+      try {
+        await contentMonitorService.registerContent(keyword, contentData);
+      } catch (error) {
+        console.error(`[WORKFLOW] Error setting up content monitoring: ${error.message}`);
+      }
       
-      console.log(`[WORKFLOW] Completed processing of keyword: "${keyword}"`);
+      // 10. Save content to disk
+      await fs.mkdir(path.dirname(cachePath), { recursive: true });
+      await fs.writeFile(cachePath, JSON.stringify(contentData, null, 2), 'utf8');
       
-      return result;
+      console.log(`[WORKFLOW] Successfully processed keyword: "${keyword}"`);
+      return contentData;
     } catch (error) {
       console.error(`[WORKFLOW] Error processing keyword "${keyword}":`, error);
       throw error;
@@ -258,6 +306,48 @@ class WorkflowService {
       return result;
     } catch (error) {
       console.error('[WORKFLOW] Error in test:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Enhanced content generation with internal linking and schema
+   * @param {string} keyword - The keyword to generate content for
+   * @returns {Promise<object>} - The processed content with enhancements
+   */
+  async generateEnhancedContent(keyword) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    console.log(`[WORKFLOW] Generating enhanced content for "${keyword}"`);
+    
+    try {
+      // 1. First process the keyword normally
+      const contentData = await this.processKeyword(keyword);
+      
+      // 2. Find internal linking opportunities
+      console.log(`[WORKFLOW] Finding internal linking opportunities for "${keyword}"`);
+      let linkOpportunities = null;
+      try {
+        linkOpportunities = await internalLinkingService.findLinkingOpportunities(keyword, contentData);
+      } catch (error) {
+        console.error(`[WORKFLOW] Error finding linking opportunities: ${error.message}`);
+      }
+      
+      // 3. Add link opportunities to content data
+      if (linkOpportunities) {
+        contentData.internalLinks = linkOpportunities;
+      }
+      
+      // 4. Save the enhanced content
+      const slug = slugify(keyword);
+      const cachePath = path.join(config.paths.content, `${slug}-content.json`);
+      await fs.writeFile(cachePath, JSON.stringify(contentData, null, 2), 'utf8');
+      
+      return contentData;
+    } catch (error) {
+      console.error(`[WORKFLOW] Error generating enhanced content for "${keyword}":`, error);
       throw error;
     }
   }
