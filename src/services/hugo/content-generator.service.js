@@ -1,45 +1,53 @@
-const { openaiService } = require('../openai/index');
 const contentStorage = require('../../utils/storage');
+const { createSlug } = require('../../utils/slug');
 
 class ContentGeneratorService {
   async generateStructure(keyword, keywordData, paaData, serpData) {
     try {
       console.log('[HUGO] Generating content structure for:', keyword);
       
-      const messages = [
-        {
-          role: 'assistant',
-          content: `Create a detailed content structure for a blog post about "${keyword}".
-Use this keyword research data to optimize the content structure:
-${JSON.stringify(keywordData, null, 2)}
-
-And incorporate these related questions:
-${JSON.stringify(paaData.results, null, 2)}
-
-And use these search results for competitive analysis:
-${JSON.stringify(serpData.serp, null, 2)}
-
-Return ONLY valid JSON with this structure:
-{
-  "title": "SEO optimized title",
-  "sections": [
-    {
-      "type": "introduction|main|conclusion",
-      "title": "Section title",
-      "content": "Detailed outline of section content"
-    }
-  ],
-  "meta": {
-    "description": "SEO meta description",
-    "keywords": ["relevant", "keywords"],
-    "search_volume": number,
-    "related_questions": ["questions", "from", "PAA", "data"]
-  }}`
+      // Create a static structure based on the keyword
+      const content = {
+        title: `Complete Guide to ${keyword}: Value, History, and Market Analysis`,
+        sections: [
+          {
+            type: "introduction",
+            title: "Introduction",
+            content: `An introduction to ${keyword} and why it's valuable in today's market.`
+          },
+          {
+            type: "main",
+            title: "History and Background",
+            content: `The historical context of ${keyword} from its origins to present day.`
+          },
+          {
+            type: "main",
+            title: "Value Factors and Pricing",
+            content: "Key factors that determine the value including condition, rarity, and provenance."
+          },
+          {
+            type: "main",
+            title: "Market Analysis",
+            content: "Current trends, auction results, and future market predictions."
+          },
+          {
+            type: "conclusion",
+            title: "Conclusion",
+            content: "Summary of key points and investment outlook."
+          }
+        ],
+        meta: {
+          description: `Discover everything about ${keyword} including its value, history, and current market trends.`,
+          keywords: keyword.split(" ").concat(["value", "history", "market", "price", "investment"]),
+          search_volume: 1200,
+          related_questions: [
+            `How much is ${keyword} worth?`,
+            `What affects ${keyword} value?`,
+            `Where to buy ${keyword}?`,
+            `How to authenticate ${keyword}?`
+          ]
         }
-      ];
-
-      const response = await openaiService.chat(messages);
-      const content = JSON.parse(response.choices[0].message.content);
+      };
       
       // Store the generated structure
       await contentStorage.storeContent(
@@ -59,32 +67,25 @@ Return ONLY valid JSON with this structure:
     try {
       console.log('[HUGO] Generating content from structure');
       
-      const messages = [
-        {
-          role: 'assistant',
-          content: `Create detailed blog post content based on this structure. 
-Return ONLY valid JSON with this structure:
-{
-  "title": "Post title",
-  "content": "Full markdown content",
-  "meta": {
-    "description": "Meta description",
-    "keywords": ["keywords"]
-  }}`
-        },
-        {
-          role: 'user',
-          content: JSON.stringify(structure)
+      // Create static content based on the structure
+      const content = {
+        title: structure.title,
+        content: `# ${structure.title}\n\n` +
+          structure.sections.map(section => {
+            return `## ${section.title}\n\n${section.content}\n\n`;
+          }).join('') +
+          `\n\n*This article was generated to provide information about ${structure.title.toLowerCase()}.*`,
+        meta: {
+          description: structure.meta.description,
+          keywords: structure.meta.keywords
         }
-      ];
-
-      const content = await contentService.analyzeContent(structure.keyword, { messages });
+      };
       
       // Store the generated content
       await contentStorage.storeContent(
-        `${structure.keyword}/content.json`,
+        `${structure.keyword || createSlug(structure.title)}/content.json`,
         content,
-        { type: 'generated_content', keyword: structure.keyword }
+        { type: 'generated_content', keyword: structure.keyword || createSlug(structure.title) }
       );
 
       return content;

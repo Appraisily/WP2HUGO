@@ -1,3 +1,4 @@
+const axios = require('axios');
 const contentStorage = require('../../utils/storage');
 const sheetsService = require('../sheets.service');
 const dataCollector = require('./data-collector.service');
@@ -8,6 +9,7 @@ const { createSlug } = require('../../utils/slug');
 class WorkflowService {
   constructor() {
     this.isProcessing = false;
+    this.batchSize = 20; // Process 20 keywords at once
   }
 
   async processWorkflow() {
@@ -23,7 +25,7 @@ class WorkflowService {
       this.isProcessing = true;
       console.log('[HUGO] Starting workflow processing');
 
-      // Get row data
+      // Get rows data (up to batchSize)
       const rows = await this.getRowData();
       if (!rows || rows.length === 0) {
         return {
@@ -33,21 +35,25 @@ class WorkflowService {
         };
       }
 
-      // Process row
-      const result = await this.processRow(rows[0]);
+      console.log(`[HUGO] Processing ${rows.length} keywords (max batch size: ${this.batchSize})`);
+
+      // Process multiple rows in parallel
+      const results = await Promise.all(
+        rows.map(row => this.processRow(row))
+      );
 
       // Store final summary
-      await this.storeSummary([result]);
+      await this.storeSummary(results);
 
       return {
         success: true,
         message: 'Workflow processing completed',
         summary: {
-          total: 1,
-          successful: result.success ? 1 : 0,
-          failed: result.success ? 0 : 1
+          total: results.length,
+          successful: results.filter(r => r.success).length,
+          failed: results.filter(r => !r.success).length
         },
-        results: [result]
+        results
       };
 
     } catch (error) {
@@ -59,22 +65,18 @@ class WorkflowService {
   }
 
   async getRowData() {
-    console.log('[HUGO] Fetching row 2 from sheets');
-    const rows = await sheetsService.getAllRows();
+    console.log(`[HUGO] Fetching up to ${this.batchSize} rows from sheets`);
+    const allRows = await sheetsService.getAllRows();
     
-    if (!rows || rows.length === 0) {
+    if (!allRows || allRows.length === 0) {
       console.log('[HUGO] No rows found in spreadsheet');
       return null;
     }
 
-    console.log('[HUGO] Row 2 data received:', {
-      rowData: rows[0],
-      hasKWs: Boolean(rows[0]?.['KWs']),
-      hasTitle: Boolean(rows[0]?.['SEO TItle']),
-      hasPostId: Boolean(rows[0]?.['Post ID']),
-      hasDate: Boolean(rows[0]?.['2025-01-28T10:25:40.252Z'])
-    });
-
+    // Limit to batchSize rows
+    const rows = allRows.slice(0, this.batchSize);
+    
+    console.log(`[HUGO] Retrieved ${rows.length} rows for processing`);
     return rows;
   }
 
@@ -83,7 +85,7 @@ class WorkflowService {
       const keyword = row['KWs'];
       
       if (!keyword) {
-        throw new Error('Missing keyword in row 2');
+        throw new Error('Missing keyword in row');
       }
 
       console.log('[HUGO] Processing keyword:', keyword);
@@ -99,11 +101,14 @@ class WorkflowService {
       console.log('[HUGO] Analyzing collected data');
       const contentAnalysis = await contentAnalyzer.analyzeKeyword(keyword, collectedData);
 
+      // Variable to store valuation response
+      let valuationResponse = null;
+
       // Send valuation description to valuation agent if available
       if (contentAnalysis.valuation_description) {
         try {
           console.log('[HUGO] Sending to valuation agent:', contentAnalysis.valuation_description);
-          const valuationResponse = await axios.post(
+          valuationResponse = await axios.post(
             'https://valuer-agent-856401495068.us-central1.run.app/api/find-value-range',
             { text: contentAnalysis.valuation_description },
             { headers: { 'Content-Type': 'application/json' } }
@@ -132,73 +137,52 @@ class WorkflowService {
             },
             { type: 'valuation_data', keyword }
           );
-
-          // Include valuation data in the result
-          return {
-            ...result,
-            valuation: {
-              range: {
-                min: valuationResponse.data.minValue,
-                max: valuationResponse.data.maxValue,
-                most_likely: valuationResponse.data.mostLikelyValue
-              },
-              has_auction_results: Boolean(valuationResponse.data.auctionResults?.length)
-            }
-          };
         } catch (error) {
           console.error('[HUGO] Error getting valuation:', error);
           // Continue processing even if valuation fails
         }
       }
 
-      // Store collected data
+      // Prepare final data object
+      const finalData = {
+        ...collectedData,
+        contentAnalysis,
+        valuation: valuationResponse?.data ? {
+          value_range: {
+            min: valuationResponse.data.minValue,
+            max: valuationResponse.data.maxValue,
+            most_likely: valuationResponse.data.mostLikelyValue
+          },
+          explanation: valuationResponse.data.explanation,
+          auction_results: valuationResponse.data.auctionResults
+        } : null,
+        metadata: {
+          keyword,
+          processedDate: new Date().toISOString(),
+          status: 'data_collected',
+          has_valuation: Boolean(valuationResponse?.data)
+        }
+      };
+
+      // Store collected data in regular path
       await contentStorage.storeContent(
         `${folderPath}/collected-data.json`,
-        {
-          ...collectedData,
-          contentAnalysis,
-          valuation: valuationResponse?.data ? {
-            value_range: {
-              min: valuationResponse.data.minValue,
-              max: valuationResponse.data.maxValue,
-              most_likely: valuationResponse.data.mostLikelyValue
-            },
-            explanation: valuationResponse.data.explanation,
-            auction_results: valuationResponse.data.auctionResults
-          } : null,
-          metadata: {
-            keyword,
-            processedDate: new Date().toISOString(),
-            status: 'data_collected',
-            has_valuation: Boolean(valuationResponse?.data)
-          }
-        },
+        finalData,
         { type: 'collected_data', keyword }
       );
 
-      // Store valuation data separately if available
-      if (valuationResponse?.data) {
-        await contentStorage.storeContent(
-          `${folderPath}/valuation.json`,
-          {
-            description: contentAnalysis.valuation_description,
-            value_range: {
-              min: valuationResponse.data.minValue,
-              max: valuationResponse.data.maxValue,
-              most_likely: valuationResponse.data.mostLikelyValue
-            },
-            explanation: valuationResponse.data.explanation,
-            auction_results: valuationResponse.data.auctionResults,
-            timestamp: new Date().toISOString()
-          },
-          { type: 'valuation_data', keyword }
-        );
-      }
+      // Store the same data in a dedicated GCS folder with keyword as filename
+      await contentStorage.storeContent(
+        `seo_keywords/${keyword}.json`,
+        finalData,
+        { type: 'keyword_data', keyword }
+      );
 
       return {
         keyword,
         slug: createSlug(keyword),
         folderPath,
+        gcsPath: `seo_keywords/${keyword}.json`,
         dataCollected: {
           hasKeywordData: Boolean(collectedData.keywordData),
           hasPaaData: Boolean(collectedData.paaData?.results?.length),

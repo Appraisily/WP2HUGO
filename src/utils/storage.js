@@ -37,6 +37,9 @@ class ContentStorage {
       throw new Error('Storage not initialized');
     }
 
+    // Ensure parent directory exists for batch processing
+    await this.ensureDirectoryExists(filePath);
+
     const file = this.bucket.file(filePath);
     
     const fileMetadata = {
@@ -80,6 +83,29 @@ class ContentStorage {
         }
       });
       throw error;
+    }
+  }
+
+  // New method to ensure directory exists for batch processing
+  async ensureDirectoryExists(filePath) {
+    if (!filePath.includes('/')) {
+      return; // No directory to create
+    }
+
+    const dirPath = filePath.split('/').slice(0, -1).join('/') + '/';
+    
+    // Create a placeholder file to represent the directory
+    const dirFile = this.bucket.file(dirPath + '.directory_placeholder');
+    
+    try {
+      const [exists] = await dirFile.exists();
+      if (!exists) {
+        console.log('[STORAGE] Creating directory:', dirPath);
+        await dirFile.save('', { resumable: false });
+      }
+    } catch (error) {
+      // Ignore errors - GCS doesn't actually need directories
+      console.log('[STORAGE] Note: GCS doesn\'t require actual directories');
     }
   }
 

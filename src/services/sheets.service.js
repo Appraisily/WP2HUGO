@@ -75,14 +75,14 @@ class SheetsService {
     }
     
     try {
-      console.log('[SHEETS] Fetching only row 2 for debugging');
+      console.log('[SHEETS] Fetching up to 20 rows for batch processing');
       const response = await this.sheets.spreadsheets.values.get({
         spreadsheetId: this.sheetsId,
-        range: 'SEO!A2:D2', // Only get row 2
+        range: 'SEO!A2:D21', // Get rows 2-21 (up to 20 rows)
       });
 
       const rows = response.data.values || [];
-      console.log('[SHEETS] Row 2 data:', rows[0]);
+      console.log(`[SHEETS] Retrieved ${rows.length} rows data`);
       
       // Convert rows to objects with column headers
       const processedRows = rows.map(row => ({
@@ -92,11 +92,11 @@ class SheetsService {
         '2025-01-28T10:25:40.252Z': row[3]?.trim() || ''
       }));
 
-      console.log('[SHEETS] Processed row 2:', processedRows[0]);
+      console.log(`[SHEETS] Processed ${processedRows.length} rows for processing`);
       return processedRows;
 
     } catch (error) {
-      console.error('[SHEETS] Error getting all rows:', error);
+      console.error('[SHEETS] Error getting rows:', error);
       throw error;
     }
   }
