@@ -5,6 +5,8 @@ const keywordReader = require('../utils/keyword-reader');
 const keywordResearchService = require('./keyword-research.service');
 const perplexityService = require('./perplexity.service');
 const googleAiService = require('./google-ai.service');
+const anthropicService = require('./anthropic.service');
+const seoQualityService = require('./seo-quality.service');
 const imageGenerationService = require('./image-generation.service');
 const markdownGeneratorService = require('./markdown-generator.service');
 const slugify = require('../utils/slugify');
@@ -33,6 +35,7 @@ class WorkflowService {
     keywordResearchService.setForceApi(value);
     perplexityService.setForceApi(value);
     googleAiService.setForceApi(value);
+    anthropicService.setForceApi(value);
     console.log(`[WORKFLOW] Force API set to: ${value}`);
   }
 
@@ -137,7 +140,7 @@ class WorkflowService {
       console.log(`[WORKFLOW] Getting comprehensive information for "${keyword}"`);
       const perplexityData = await perplexityService.query(keyword);
       
-      // 3. NEW: Analyze top competitors to identify winning strategies
+      // 3. Analyze top competitors to identify winning strategies
       let competitorAnalysis = null;
       if (researchData && researchData.serp && researchData.serp.results) {
         console.log(`[WORKFLOW] Analyzing competitors for "${keyword}"`);
@@ -148,7 +151,7 @@ class WorkflowService {
         }
       }
       
-      // 4. Generate blog post structure
+      // 4. Generate blog post structure using Google AI
       console.log(`[WORKFLOW] Generating content structure for "${keyword}"`);
       
       // Include competitor insights in structure prompt if available
@@ -170,26 +173,27 @@ Based on competitor analysis, consider these insights:
         additionalStructureInfo
       );
       
-      // 5. Generate image
+      // 5. NEW: Enhance content using Anthropic (Claude)
+      console.log(`[WORKFLOW] Enhancing content quality with Anthropic for "${keyword}"`);
+      const enhancedContent = await anthropicService.enhanceContent(
+        keyword,
+        structureData,
+        perplexityData,
+        competitorAnalysis?.insights || null
+      );
+      
+      // 6. NEW: Perform final SEO optimization with Anthropic
+      console.log(`[WORKFLOW] Performing final SEO optimization for "${keyword}"`);
+      const optimizedContent = await anthropicService.optimizeContentForSeo(
+        keyword,
+        enhancedContent
+      );
+      
+      // 7. Generate image
       console.log(`[WORKFLOW] Generating image for "${keyword}"`);
       const imageData = await imageGenerationService.generateImage(keyword, structureData);
       
-      // 6. Compile final content
-      const contentData = {
-        keyword,
-        slug,
-        title: structureData.title || `${keyword} - Comprehensive Guide`,
-        description: structureData.metaDescription || `Learn everything about ${keyword} in this comprehensive guide.`,
-        date: new Date().toISOString(),
-        lastUpdated: new Date().toISOString(),
-        researchData,
-        perplexityData,
-        structure: structureData,
-        image: imageData,
-        competitorAnalysis: competitorAnalysis?.success ? competitorAnalysis.insights : null
-      };
-      
-      // 7. NEW: Generate appropriate schema markup based on content type
+      // 8. Generate schema markup based on content type
       let contentType = 'article'; // Default type
       if (structureData.contentType) {
         contentType = structureData.contentType;
@@ -200,30 +204,74 @@ Based on competitor analysis, consider these insights:
       }
       
       console.log(`[WORKFLOW] Generating schema markup for "${keyword}" (${contentType})`);
+      let schemaMarkup = null;
       try {
-        const schemaMarkup = await schemaMarkupService.generateSchemaMarkup(keyword, contentData, contentType);
-        contentData.schema = schemaMarkup;
+        schemaMarkup = await schemaMarkupService.generateSchemaMarkup(keyword, optimizedContent, contentType);
       } catch (error) {
         console.error(`[WORKFLOW] Error generating schema markup: ${error.message}`);
       }
       
-      // 8. NEW: Register content in the internal linking service
+      // 9. NEW: Assess SEO quality
+      console.log(`[WORKFLOW] Assessing SEO quality for "${keyword}"`);
+      const contentToAssess = {
+        keyword,
+        title: optimizedContent.optimizedContent?.title || structureData.title,
+        description: optimizedContent.optimizedContent?.meta_description || structureData.meta_description,
+        structure: optimizedContent.optimizedContent || structureData,
+        schema: schemaMarkup
+      };
+      
+      const qualityAssessment = await seoQualityService.assessQuality(keyword, contentToAssess);
+      
+      // 10. NEW: Generate improvement recommendations if score is below threshold
+      let seoRecommendations = null;
+      if (qualityAssessment.overallScore < 85) {
+        console.log(`[WORKFLOW] Generating SEO improvement recommendations for "${keyword}"`);
+        seoRecommendations = await seoQualityService.generateRecommendations(keyword, qualityAssessment);
+      }
+      
+      // 11. Register content in the internal linking service
       console.log(`[WORKFLOW] Registering "${keyword}" in content registry for internal linking`);
       try {
-        await internalLinkingService.registerContent(keyword, contentData);
+        await internalLinkingService.registerContent(keyword, contentToAssess);
       } catch (error) {
         console.error(`[WORKFLOW] Error registering content for linking: ${error.message}`);
       }
       
-      // 9. NEW: Register content for monitoring
+      // 12. Register content for monitoring
       console.log(`[WORKFLOW] Setting up content monitoring for "${keyword}"`);
       try {
-        await contentMonitorService.registerContent(keyword, contentData);
+        await contentMonitorService.registerContent(keyword, contentToAssess);
       } catch (error) {
         console.error(`[WORKFLOW] Error setting up content monitoring: ${error.message}`);
       }
       
-      // 10. Save content to disk
+      // 13. Compile final content
+      const contentData = {
+        keyword,
+        slug,
+        title: optimizedContent.optimizedContent?.title || structureData.title || `${keyword} - Comprehensive Guide`,
+        description: optimizedContent.optimizedContent?.meta_description || structureData.meta_description || `Learn everything about ${keyword} in this comprehensive guide.`,
+        date: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        researchData,
+        perplexityData,
+        structure: structureData,
+        enhancedContent: enhancedContent.enhancedContent || enhancedContent,
+        optimizedContent: optimizedContent.optimizedContent || optimizedContent,
+        seoAssessment: qualityAssessment,
+        seoRecommendations,
+        image: imageData,
+        schema: schemaMarkup,
+        competitorAnalysis: competitorAnalysis?.success ? competitorAnalysis.insights : null,
+        seoScore: qualityAssessment.overallScore,
+        keywordDensity: optimizedContent.optimizedContent?.keywordDensity || "Unknown",
+        internalLinkingSuggestions: optimizedContent.optimizedContent?.internalLinkingSuggestions || [],
+        readabilityEnhancements: optimizedContent.optimizedContent?.readabilityEnhancements || [],
+        previousSeoAssessment: null
+      };
+      
+      // 14. Save content to disk
       await fs.mkdir(path.dirname(cachePath), { recursive: true });
       await fs.writeFile(cachePath, JSON.stringify(contentData, null, 2), 'utf8');
       
@@ -328,43 +376,185 @@ Based on competitor analysis, consider these insights:
   }
 
   /**
-   * Enhanced content generation with internal linking and schema
-   * @param {string} keyword - The keyword to generate content for
-   * @returns {Promise<object>} - The processed content with enhancements
+   * Improve existing content based on SEO recommendations
+   * @param {string} keyword - The keyword to improve content for
+   * @returns {Promise<object>} - The improved content
    */
-  async generateEnhancedContent(keyword) {
+  async improveExistingContent(keyword) {
     if (!this.initialized) {
       await this.initialize();
     }
 
-    console.log(`[WORKFLOW] Generating enhanced content for "${keyword}"`);
+    console.log(`[WORKFLOW] Improving existing content for "${keyword}"`);
     
     try {
-      // 1. First process the keyword normally
-      const contentData = await this.processKeyword(keyword);
-      
-      // 2. Find internal linking opportunities
-      console.log(`[WORKFLOW] Finding internal linking opportunities for "${keyword}"`);
-      let linkOpportunities = null;
-      try {
-        linkOpportunities = await internalLinkingService.findLinkingOpportunities(keyword, contentData);
-      } catch (error) {
-        console.error(`[WORKFLOW] Error finding linking opportunities: ${error.message}`);
-      }
-      
-      // 3. Add link opportunities to content data
-      if (linkOpportunities) {
-        contentData.internalLinks = linkOpportunities;
-      }
-      
-      // 4. Save the enhanced content
       const slug = slugify(keyword);
       const cachePath = path.join(config.paths.content, `${slug}-content.json`);
-      await fs.writeFile(cachePath, JSON.stringify(contentData, null, 2), 'utf8');
       
-      return contentData;
+      // Check if content exists
+      const contentExists = await fs.access(cachePath).then(() => true).catch(() => false);
+      
+      if (!contentExists) {
+        console.log(`[WORKFLOW] No existing content found for "${keyword}". Processing as new content.`);
+        return await this.processKeyword(keyword);
+      }
+      
+      // Load existing content
+      const existingContent = JSON.parse(await fs.readFile(cachePath, 'utf8'));
+      
+      // Assess SEO quality if not already assessed
+      let qualityAssessment = existingContent.seoAssessment;
+      if (!qualityAssessment) {
+        console.log(`[WORKFLOW] Assessing SEO quality for "${keyword}"`);
+        qualityAssessment = await seoQualityService.assessQuality(keyword, existingContent);
+      }
+      
+      // Only improve if score is below threshold
+      if (qualityAssessment.overallScore >= 90) {
+        console.log(`[WORKFLOW] Content for "${keyword}" already has excellent SEO score (${qualityAssessment.overallScore}). No improvements needed.`);
+        return existingContent;
+      }
+      
+      // Generate recommendations if not already available
+      let seoRecommendations = existingContent.seoRecommendations;
+      if (!seoRecommendations) {
+        console.log(`[WORKFLOW] Generating SEO improvement recommendations for "${keyword}"`);
+        seoRecommendations = await seoQualityService.generateRecommendations(keyword, qualityAssessment);
+      }
+      
+      // Use Anthropic to improve content based on recommendations
+      console.log(`[WORKFLOW] Using Anthropic to improve content for "${keyword}" based on SEO recommendations`);
+      
+      // Extract high priority recommendations
+      const highPriorityIssues = seoRecommendations.prioritizedActions
+        .filter(action => action.priority === 'High' || action.priority === 'Critical')
+        .map(action => `${action.issue}: ${action.recommendation}`)
+        .join('\n');
+      
+      // Perform content improvement
+      const improvedContent = await anthropicService.enhanceContent(
+        keyword,
+        existingContent.structure || existingContent,
+        existingContent.perplexityData,
+        {
+          contentImprovements: highPriorityIssues,
+          seoScore: qualityAssessment.overallScore
+        }
+      );
+      
+      // Final SEO optimization
+      const optimizedContent = await anthropicService.optimizeContentForSeo(
+        keyword,
+        improvedContent
+      );
+      
+      // Reassess SEO quality
+      const contentToReassess = {
+        keyword,
+        title: optimizedContent.optimizedContent?.title || existingContent.title,
+        description: optimizedContent.optimizedContent?.meta_description || existingContent.description,
+        structure: optimizedContent.optimizedContent || improvedContent.enhancedContent,
+        schema: existingContent.schema
+      };
+      
+      const newQualityAssessment = await seoQualityService.assessQuality(keyword, contentToReassess);
+      
+      // Update content data
+      const updatedContent = {
+        ...existingContent,
+        title: optimizedContent.optimizedContent?.title || existingContent.title,
+        description: optimizedContent.optimizedContent?.meta_description || existingContent.description,
+        lastUpdated: new Date().toISOString(),
+        enhancedContent: improvedContent.enhancedContent || improvedContent,
+        optimizedContent: optimizedContent.optimizedContent || optimizedContent,
+        previousSeoAssessment: existingContent.seoAssessment || qualityAssessment,
+        seoAssessment: newQualityAssessment,
+        seoRecommendations,
+        seoScore: newQualityAssessment.overallScore,
+        keywordDensity: optimizedContent.optimizedContent?.keywordDensity || existingContent.keywordDensity || "Unknown",
+        improvementsMade: true,
+        improvementDate: new Date().toISOString()
+      };
+      
+      // Save updated content
+      await fs.writeFile(cachePath, JSON.stringify(updatedContent, null, 2), 'utf8');
+      
+      console.log(`[WORKFLOW] Successfully improved content for "${keyword}". SEO score improved from ${qualityAssessment.overallScore} to ${newQualityAssessment.overallScore}`);
+      
+      return updatedContent;
     } catch (error) {
-      console.error(`[WORKFLOW] Error generating enhanced content for "${keyword}":`, error);
+      console.error(`[WORKFLOW] Error improving content for "${keyword}":`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Batch improve all existing content
+   * @returns {array} - Results of improving all content
+   */
+  async batchImproveAllContent() {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    
+    try {
+      console.log('[WORKFLOW] Starting batch improvement of all content');
+      
+      // Get all content files
+      const contentDir = path.join(config.paths.content);
+      await fs.mkdir(contentDir, { recursive: true });
+      
+      const files = await fs.readdir(contentDir);
+      const contentFiles = files.filter(file => file.endsWith('-content.json'));
+      
+      console.log(`[WORKFLOW] Found ${contentFiles.length} content files to check for improvements`);
+      
+      const results = [];
+      
+      // Process each file
+      for (const file of contentFiles) {
+        try {
+          // Extract keyword from filename
+          const slug = file.replace('-content.json', '');
+          const contentData = JSON.parse(await fs.readFile(path.join(contentDir, file), 'utf8'));
+          const keyword = contentData.keyword;
+          
+          if (!keyword) {
+            console.warn(`[WORKFLOW] Could not determine keyword for file: ${file}. Skipping.`);
+            continue;
+          }
+          
+          console.log(`[WORKFLOW] Checking if content for "${keyword}" needs improvement`);
+          
+          // Check SEO score
+          const currentScore = contentData.seoScore || 
+                              (contentData.seoAssessment ? contentData.seoAssessment.overallScore : 0);
+          
+          if (currentScore >= 90) {
+            console.log(`[WORKFLOW] Content for "${keyword}" already has excellent SEO score (${currentScore}). Skipping.`);
+            continue;
+          }
+          
+          // Improve content
+          console.log(`[WORKFLOW] Improving content for "${keyword}" (current score: ${currentScore})`);
+          const improvedContent = await this.improveExistingContent(keyword);
+          
+          results.push({
+            keyword,
+            oldScore: currentScore,
+            newScore: improvedContent.seoScore || (improvedContent.seoAssessment ? improvedContent.seoAssessment.overallScore : 0),
+            improved: true
+          });
+        } catch (error) {
+          console.error(`[WORKFLOW] Error processing file ${file}:`, error);
+        }
+      }
+      
+      console.log(`[WORKFLOW] Completed batch improvement. Total improved: ${results.length}`);
+      
+      return results;
+    } catch (error) {
+      console.error('[WORKFLOW] Error in batch improvement:', error);
       throw error;
     }
   }
