@@ -174,7 +174,7 @@ Please provide detailed, accurate, and up-to-date information that would be valu
         const response = await axios.post(
           `${this.baseUrl}/chat/completions`,
           {
-            model: "sonar-medium-online",
+            model: "sonar",
             messages: [
               {
                 role: "system",
@@ -274,7 +274,7 @@ Please provide detailed, accurate, and up-to-date information that would be valu
         const response = await axios.post(
           `${this.baseUrl}/chat/completions`,
           {
-            model: "sonar-medium-online",
+            model: "sonar",
             messages: [
               {
                 role: "system",
