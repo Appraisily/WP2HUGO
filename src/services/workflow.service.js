@@ -152,7 +152,7 @@ Based on competitor analysis, consider these insights:
 `;
       }
       
-      const structureData = await googleAiService.generateContentStructure(
+      const structureData = await googleAiService.generateStructure(
         keyword, 
         researchData, 
         perplexityData,
