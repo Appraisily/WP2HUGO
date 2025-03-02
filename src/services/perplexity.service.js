@@ -10,6 +10,13 @@ class PerplexityService {
     this.apiKey = null;
     this.baseUrl = config.perplexity?.baseUrl || 'https://api.perplexity.ai';
     this.useMockData = false;
+    this.forceApi = false;
+  }
+
+  // Add method to force using API data
+  setForceApi(value) {
+    this.forceApi = value;
+    console.log(`[PERPLEXITY] Force API set to: ${value}`);
   }
 
   async initialize() {
@@ -136,7 +143,7 @@ class PerplexityService {
       const slug = slugify(keyword);
       const filePath = path.join(config.paths.research, `${slug}-perplexity.json`);
       
-      if (await localStorage.fileExists(filePath)) {
+      if (!this.forceApi && await localStorage.fileExists(filePath)) {
         console.log(`[PERPLEXITY] Using cached data for: "${keyword}"`);
         return await localStorage.readFile(filePath);
       }
@@ -163,6 +170,7 @@ Please provide detailed, accurate, and up-to-date information that would be valu
       
       try {
         // Make API request
+        console.log(`[PERPLEXITY] Calling API for: "${keyword}"`);
         const response = await axios.post(
           `${this.baseUrl}/chat/completions`,
           {
@@ -238,7 +246,7 @@ Please provide detailed, accurate, and up-to-date information that would be valu
       const slug = slugify(`${keyword}-${aspect}`);
       const filePath = path.join(config.paths.research, `${slug}-perplexity-aspect.json`);
       
-      if (await localStorage.fileExists(filePath)) {
+      if (!this.forceApi && await localStorage.fileExists(filePath)) {
         console.log(`[PERPLEXITY] Using cached data for aspect "${aspect}" of keyword: "${keyword}"`);
         return await localStorage.readFile(filePath);
       }
@@ -262,6 +270,7 @@ Please provide detailed, accurate, and up-to-date information that would be valu
       
       try {
         // Make API request
+        console.log(`[PERPLEXITY] Calling API for aspect "${aspect}" of keyword: "${keyword}"`);
         const response = await axios.post(
           `${this.baseUrl}/chat/completions`,
           {

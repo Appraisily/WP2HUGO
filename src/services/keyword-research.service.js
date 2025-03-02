@@ -10,6 +10,13 @@ class KeywordResearchService {
     this.apiKey = null;
     this.baseUrl = config.kwrds?.baseUrl || 'https://api.kwrds.ai/v1';
     this.useMockData = false;
+    this.forceApi = false;
+  }
+
+  // Add method to force using API data
+  setForceApi(value) {
+    this.forceApi = value;
+    console.log(`[KEYWORD-RESEARCH] Force API set to: ${value}`);
   }
 
   async initialize() {
@@ -130,7 +137,7 @@ class KeywordResearchService {
       const slug = slugify(keyword);
       const filePath = path.join(config.paths.research, `${slug}-kwrds.json`);
       
-      if (await localStorage.fileExists(filePath)) {
+      if (!this.forceApi && await localStorage.fileExists(filePath)) {
         console.log(`[KEYWORD-RESEARCH] Using cached data for: "${keyword}"`);
         return await localStorage.readFile(filePath);
       }
@@ -143,6 +150,7 @@ class KeywordResearchService {
       }
       
       // Otherwise, call the API
+      console.log(`[KEYWORD-RESEARCH] Calling API for: "${keyword}"`);
       const response = await axios.post(
         `${this.baseUrl}/keyword-data`,
         { keyword },

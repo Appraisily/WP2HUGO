@@ -12,6 +12,13 @@ class GoogleAIService {
     this.model = config.googleAi?.model || 'gemini-1.5-pro';
     this.maxOutputTokens = config.googleAi?.maxOutputTokens || 4000;
     this.useMockData = false;
+    this.forceApi = false;
+  }
+
+  // Add method to force using API data
+  setForceApi(value) {
+    this.forceApi = value;
+    console.log(`[GOOGLE-AI] Force API set to: ${value}`);
   }
 
   async initialize() {
@@ -202,7 +209,7 @@ class GoogleAIService {
       const slug = slugify(keyword);
       const filePath = path.join(config.paths.research, `${slug}-googleai-structure.json`);
       
-      if (await localStorage.fileExists(filePath)) {
+      if (!this.forceApi && await localStorage.fileExists(filePath)) {
         console.log(`[GOOGLE-AI] Using cached structure for: "${keyword}"`);
         return await localStorage.readFile(filePath);
       }
@@ -241,6 +248,7 @@ Please provide a detailed blog post structure including:
 Make sure the structure is comprehensive, addresses user intent, and covers all important aspects of the topic. The goal is to create content that is more valuable and informative than the current top-ranking pages.`;
       
       // Make API request
+      console.log(`[GOOGLE-AI] Calling API for: "${keyword}"`);
       const response = await axios.post(
         `${this.baseUrl}/${this.model}:generateContent?key=${this.apiKey}`,
         {

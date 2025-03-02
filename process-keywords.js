@@ -9,6 +9,7 @@ const fs = require('fs').promises;
 const args = process.argv.slice(2);
 let keywordsFile = null;
 let singleKeyword = null;
+let forceApi = false;
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--file' && i + 1 < args.length) {
@@ -17,6 +18,8 @@ for (let i = 0; i < args.length; i++) {
   } else if (args[i] === '--keyword' && i + 1 < args.length) {
     singleKeyword = args[i + 1];
     i++; // Skip the next argument as it's the keyword
+  } else if (args[i] === '--force-api') {
+    forceApi = true;
   }
 }
 
@@ -32,6 +35,12 @@ async function main() {
     }
     
     await workflowService.initialize();
+    
+    // Set force API flag if specified
+    if (forceApi) {
+      console.log('Forcing to use API data even when cache exists');
+      workflowService.setForceApi(true);
+    }
     
     // Process a single keyword if specified, otherwise process all keywords
     if (singleKeyword) {

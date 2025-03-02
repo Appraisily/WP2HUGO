@@ -17,12 +17,23 @@ const contentMonitorService = require('./content-monitor.service');
 class WorkflowService {
   constructor() {
     this.initialized = false;
+    this.forceApi = false;
   }
 
   // Add a method to set the keywords path
   setKeywordsPath(keywordsPath) {
     // Update the path in the keyword reader
     keywordReader.setKeywordsPath(keywordsPath);
+  }
+
+  // Add a method to force using API data
+  setForceApi(value) {
+    this.forceApi = value;
+    // Propagate the setting to other services
+    keywordResearchService.setForceApi(value);
+    perplexityService.setForceApi(value);
+    googleAiService.setForceApi(value);
+    console.log(`[WORKFLOW] Force API set to: ${value}`);
   }
 
   async initialize() {
