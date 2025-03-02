@@ -34,7 +34,7 @@ const config = {
       maxOutputTokens: 4096,
     },
     imageGeneration: {
-      baseUrl: 'http://localhost:3001',
+      baseUrl: 'https://image-generation-service-856401495068.us-central1.run.app',
       timeout: 120000, // 120 seconds (images take longer to generate)
     }
   }

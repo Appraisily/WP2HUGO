@@ -9,6 +9,13 @@ class KeywordReader {
     this.keywords = [];
   }
 
+  // Add a method to set the keywords path
+  setKeywordsPath(keywordsPath) {
+    this.keywordsPath = keywordsPath;
+    this.initialized = false; // Reset initialization to reload keywords
+    console.log(`[KEYWORD-READER] Keywords path set to: ${keywordsPath}`);
+  }
+
   async initialize() {
     try {
       if (!this.keywordsPath) {

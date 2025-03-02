@@ -19,6 +19,12 @@ class WorkflowService {
     this.initialized = false;
   }
 
+  // Add a method to set the keywords path
+  setKeywordsPath(keywordsPath) {
+    // Update the path in the keyword reader
+    keywordReader.setKeywordsPath(keywordsPath);
+  }
+
   async initialize() {
     try {
       // Initialize required services
@@ -118,7 +124,7 @@ class WorkflowService {
       
       // 2. Get comprehensive information from Perplexity
       console.log(`[WORKFLOW] Getting comprehensive information for "${keyword}"`);
-      const perplexityData = await perplexityService.getComprehensiveInfo(keyword);
+      const perplexityData = await perplexityService.query(keyword);
       
       // 3. NEW: Analyze top competitors to identify winning strategies
       let competitorAnalysis = null;
