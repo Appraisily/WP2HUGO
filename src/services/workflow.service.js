@@ -221,7 +221,7 @@ Based on competitor analysis, consider these insights:
         schema: schemaMarkup
       };
       
-      const qualityAssessment = await seoQualityService.assessQuality(keyword, contentToAssess);
+      const qualityAssessment = await seoQualityService.evaluateContent(keyword, contentToAssess);
       
       // 10. NEW: Generate improvement recommendations if score is below threshold
       let seoRecommendations = null;
@@ -406,7 +406,7 @@ Based on competitor analysis, consider these insights:
       let qualityAssessment = existingContent.seoAssessment;
       if (!qualityAssessment) {
         console.log(`[WORKFLOW] Assessing SEO quality for "${keyword}"`);
-        qualityAssessment = await seoQualityService.assessQuality(keyword, existingContent);
+        qualityAssessment = await seoQualityService.evaluateContent(keyword, existingContent);
       }
       
       // Only improve if score is below threshold
@@ -457,7 +457,7 @@ Based on competitor analysis, consider these insights:
         schema: existingContent.schema
       };
       
-      const newQualityAssessment = await seoQualityService.assessQuality(keyword, contentToReassess);
+      const newQualityAssessment = await seoQualityService.evaluateContent(keyword, contentToReassess);
       
       // Update content data
       const updatedContent = {
