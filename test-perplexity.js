@@ -5,15 +5,11 @@ async function testPerplexityApi() {
   try {
     console.log('Testing Perplexity API...');
     
-    const apiKey = process.env.PERPLEXITY_API_KEY;
-    console.log('API Key:', apiKey ? `${apiKey.substring(0, 5)}...${apiKey.substring(apiKey.length - 5)}` : 'Not found');
+    // Use the API key directly
+    const apiKey = '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';
+    console.log('Using API Key:', `${apiKey.substring(0, 5)}...${apiKey.substring(apiKey.length - 5)}`);
     
-    if (!apiKey) {
-      console.error('Perplexity API key not found in environment variables');
-      return;
-    }
-    
-    console.log('API Key found, making request...');
+    console.log('Making request...');
     
     const keyword = 'antique value guide';
     const prompt = `I need comprehensive information about "${keyword}" for creating an SEO-optimized blog post. Please provide:
@@ -30,7 +26,7 @@ Please provide detailed, accurate, and up-to-date information that would be valu
     const response = await axios.post(
       'https://api.perplexity.ai/chat/completions',
       {
-        model: "sonar-medium-online",
+        model: "llama-3-sonar-small-32k-online",
         messages: [
           {
             role: "system",
