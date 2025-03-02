@@ -10,10 +10,10 @@ class LocalStorage {
   async initialize() {
     try {
       // Create output directories if they don't exist
-      await this.ensureDirectoryExists(config.paths.output);
-      await this.ensureDirectoryExists(config.paths.research);
-      await this.ensureDirectoryExists(config.paths.content);
-      await this.ensureDirectoryExists(config.paths.hugoContent);
+      if (config.paths.output) await this.ensureDirectoryExists(config.paths.output);
+      if (config.paths.research) await this.ensureDirectoryExists(config.paths.research);
+      if (config.paths.content) await this.ensureDirectoryExists(config.paths.content);
+      if (config.paths.hugoContent) await this.ensureDirectoryExists(config.paths.hugoContent);
       
       console.log('[LOCAL-STORAGE] Local storage initialized successfully');
       this.initialized = true;
@@ -26,6 +26,10 @@ class LocalStorage {
 
   async ensureDirectoryExists(dirPath) {
     try {
+      if (!dirPath) {
+        console.error('[LOCAL-STORAGE] Invalid directory path: undefined or null');
+        return false;
+      }
       await fs.mkdir(dirPath, { recursive: true });
       return true;
     } catch (error) {

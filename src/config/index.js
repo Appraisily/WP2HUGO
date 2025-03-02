@@ -13,6 +13,8 @@ const config = {
     content: path.join(OUTPUT_PATH, 'content'),
     images: path.join(OUTPUT_PATH, 'images'),
     markdown: path.join(OUTPUT_PATH, 'markdown'),
+    hugoContent: path.join(ROOT_PATH, 'content'),
+    keywords: path.join(ROOT_PATH, 'keywords.txt'),
   },
   
   // API configurations
