@@ -14,9 +14,13 @@
     </div>
   </header>
 
-  {{ with .Params.image }}
-  <div class="post-image">
-    <img src="{{ . }}" alt="{{ $.Title }}" />
+  {{ if .Params.image }}
+  <div class="post-featured-image">
+    <img src="{{ .Params.image }}" alt="{{ .Title }}" class="featured-image" />
+  </div>
+  {{ else if .Params.featured_image }}
+  <div class="post-featured-image">
+    <img src="{{ .Params.featured_image }}" alt="{{ .Title }}" class="featured-image" />
   </div>
   {{ end }}
 
@@ -34,4 +38,19 @@
     {{ end }}
   </footer>
 </article>
+
+<style>
+  .post-featured-image {
+    margin-bottom: 2rem;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .featured-image {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+</style>
 {{ end }}

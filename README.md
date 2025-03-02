@@ -1,158 +1,97 @@
-# WP2HUGO: Enhanced SEO Content Generation System
+# WP2HUGO Content Generation System
 
-A powerful system that automatically generates high-quality, SEO-optimized content by leveraging multiple AI services and SEO best practices.
+A comprehensive system for generating high-quality markdown content from keywords with built-in SEO optimization and image generation.
 
 ## Features
 
-- **Multi-Model AI Integration**: Combines the strengths of Google AI Gemini, Anthropic Claude, and Perplexity's Sonar for comprehensive content generation
-- **Automated SEO Optimization**: Ensures content meets all SEO requirements with proper keyword density, structure, and metadata
-- **Content Quality Assessment**: Automatically evaluates content against 20+ SEO factors and provides specific improvement recommendations
-- **Schema Markup Generation**: Creates appropriate schema markup for better search engine understanding
-- **Competitor Analysis**: Analyzes top-ranking content to identify winning strategies and content gaps
-- **Internal Linking System**: Suggests relevant internal links to enhance site structure
-- **Continuous Quality Improvement**: Automatically improves existing content based on SEO assessment with a minimum score threshold
-- **WordPress to Hugo Migration**: Specialized tools for transforming WordPress content to Hugo-compatible markdown
+- **Systematic Content Generation**: Transform keywords into structured, SEO-optimized content
+- **Image Generation**: Automatically generate relevant images for content
+- **Content Optimization**: Enhance content quality with AI-powered optimization
+- **Batch Processing**: Process multiple keywords from a file
+- **Hugo Export**: Export generated content to Hugo-compatible format
 
-## How It Works
-
-1. **Keyword Research**: Analyzes the target keyword to understand search intent, competition, and related terms
-2. **Perplexity Research**: Uses Perplexity AI (Sonar model) to gather comprehensive information about the topic
-3. **Competitor Analysis**: Studies top-ranking content to identify content gaps and winning elements
-4. **Structure Generation**: Uses Google AI Gemini to create an optimal content structure
-5. **Content Enhancement**: Leverages Anthropic Claude to enhance the content with expert insights, semantic depth, and authority signals
-6. **SEO Optimization**: Fine-tunes content for perfect keyword density, readability, and engagement
-7. **Quality Assessment**: Evaluates the content against SEO factors and provides an overall score
-8. **Markdown Generation**: Creates SEO-optimized markdown files with proper frontmatter for Hugo
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js (v14+)
-- API keys for:
-  - Perplexity AI
-  - Google AI Gemini
-  - Anthropic Claude
-  - KWRDS API (for keyword research)
-
-### Installation
+## Installation
 
 1. Clone this repository
-2. Run `npm install` to install dependencies
+2. Install dependencies:
+   ```
+   npm install
+   ```
 3. Create a `.env` file with your API keys:
+   ```
+   OPENAI_API_KEY=your_openai_api_key
+   ANTHROPIC_API_KEY=your_anthropic_api_key
+   GOOGLEAI_API_KEY=your_googleai_api_key
+   PERPLEXITY_API_KEY=your_perplexity_api_key
+   ```
 
-```
-PERPLEXITY_API_KEY=your_perplexity_api_key
-GOOGLE_AI_API_KEY=your_google_ai_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key
-KWRDS_API_KEY=your_kwrds_api_key
-```
+## Usage
 
-### Usage
-
-#### Process a single keyword
-
-```bash
-node process-keywords.js --keyword "your keyword"
-```
-
-#### Process a list of keywords from a file
+### Generate Content for a Single Keyword
 
 ```bash
-node process-keywords.js --file keywords.txt
+node systematic-content-generator.js "your keyword" [options]
 ```
 
-#### Force API usage (ignore cache)
+Options:
+- `--force-api`: Force use of real APIs instead of mock clients
+- `--skip-image`: Skip image generation step
+- `--min-score=N`: Set minimum SEO score threshold (default: 85)
+
+### Process Multiple Keywords from a File
 
 ```bash
-node process-keywords.js --keyword "your keyword" --force-api
+node process-batch.js keywords.txt [options]
 ```
 
-#### Improve existing content
+Options:
+- `--force-api`: Force use of real APIs instead of mock clients
+- `--skip-image`: Skip image generation step
+- `--min-score=N`: Set minimum SEO score threshold (default: 85)
+- `--delay=N`: Delay in seconds between processing keywords (default: 5)
 
-```bash
-node improve-content.js --keyword "your keyword"
-```
+## Content Generation Process
 
-#### Batch improve all content below a minimum SEO score
+The system follows a systematic process for each keyword:
 
-```bash
-node improve-content.js --all
-# OR with a custom minimum score
-node improve-content.js --all --min-score=80
-```
+1. **Research**: Collect initial data and related keywords
+2. **Content Structure**: Generate a structural outline with headings
+3. **Content Enhancement**: Add detailed content and improve quality
+4. **Content Optimization**: Optimize for SEO factors and readability
+5. **Image Generation**: Create a relevant feature image
+6. **Markdown Generation**: Compile all data into a markdown file
+7. **Hugo Export**: Format and export for Hugo static site generator
 
-## Output
+## Image Generation Service
 
-The system generates:
+The system integrates with an image generation service available at:
+- https://image-generation-service-856401495068.us-central1.run.app
 
-- **Research data**: Keyword research, competitor analysis, and topic information in `output/research`
-- **Content structure**: Title, headings, and section outlines
-- **Enhanced content**: Complete, SEO-optimized content
-- **SEO assessment**: Content quality score and improvement recommendations
-- **Markdown files**: Ready-to-publish content files in `output/markdown`
-- **Schema markup**: Structured data for search engines
+## Memory Management
 
-## Content Quality Assessment
+Due to the intensive nature of content generation, the system includes several memory management features:
+- Each step runs as a separate process
+- Garbage collection is triggered after major steps
+- Memory limits are set for Node.js processes
 
-The system evaluates content against multiple SEO factors including:
+## Output Files
 
-- Title quality and keyword usage
-- Meta description optimization
-- Headings structure and keyword inclusion
-- Content length and comprehensiveness
-- Keyword density and placement
-- Introduction and conclusion quality
-- Schema markup completeness
-- Internal linking
-
-Each assessment provides:
-- An overall SEO score (0-100)
-- High-priority issues that need immediate attention
-- Medium-priority recommendations for improvement
-- Strengths of the current content
-
-## Advanced Configuration
-
-You can customize the system behavior by modifying `src/config.js`:
-
-- Adjust keyword density targets
-- Configure content length goals
-- Set quality thresholds
-- Customize output paths
-- Configure AI model parameters
-
-## Services Architecture
-
-The system is built on a modular service architecture:
-
-- **WorkflowService**: Orchestrates the entire content generation and optimization process
-- **KeywordResearchService**: Analyzes keywords for search intent and competition
-- **PerplexityService**: Gathers comprehensive information about topics
-- **GoogleAIService**: Generates optimal content structure
-- **AnthropicService**: Enhances content quality and performs SEO optimization
-- **SeoQualityService**: Assesses content quality and provides recommendations
-- **MarkdownGeneratorService**: Creates Hugo-compatible markdown files
-- **SchemaMarkupService**: Generates structured data for SEO
-- **InternalLinkingService**: Manages content relationships for better site structure
+Generated files are stored in the following locations:
+- Research data: `output/research/`
+- Markdown files: `output/markdown/`
+- Images: `output/images/`
+- Hugo exports: `content/`
+- Batch results: `batch-results.json`
 
 ## Troubleshooting
 
-If you encounter any issues:
-
-1. Check that your API keys are valid and properly set in the `.env` file
-2. Ensure you have the latest version of Node.js
-3. Check the console output for specific error messages
-4. Try running with the `--force-api` flag to bypass cached data
-5. If receiving memory errors, try processing fewer keywords at once
+If you encounter errors:
+1. Check API keys in your `.env` file
+2. Ensure all services are running
+3. Check log files for detailed error messages
+4. Try running individual steps manually to isolate issues
+5. Increase memory with `NODE_OPTIONS=--max-old-space-size=8192`
 
 ## License
 
-MIT
-
-## Acknowledgements
-
-This system integrates multiple AI technologies:
-- [Perplexity AI](https://perplexity.ai)
-- [Google AI Gemini](https://ai.google.dev/)
-- [Anthropic Claude](https://anthropic.com/claude)
+This project is licensed under the MIT License - see the LICENSE file for details.

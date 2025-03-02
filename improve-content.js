@@ -1,94 +1,151 @@
 #!/usr/bin/env node
 
+/**
+ * Content SEO Optimization Script
+ * 
+ * This script optimizes enhanced content for SEO using Anthropic's Claude AI.
+ * It ensures the content meets SEO best practices and achieves a minimum
+ * quality score.
+ * 
+ * Usage: node improve-content.js --keyword "your keyword" [options]
+ * Options:
+ *   --force-api      Force use of real APIs instead of mock clients
+ *   --min-score=N    Set minimum SEO score threshold (default: 85)
+ */
+
 require('dotenv').config();
-const workflowService = require('./src/services/workflow.service');
-const path = require('path');
 const fs = require('fs').promises;
+const path = require('path');
+const anthropicService = require('./src/services/anthropic.service');
+const seoQualityService = require('./src/services/seo-quality.service');
+const slugify = require('./src/utils/slugify');
 
-// Parse command line arguments
+// Parse command-line arguments
 const args = process.argv.slice(2);
-let targetKeyword = null;
-let improveAll = false;
-let minScore = 85; // Default minimum SEO score
+let keyword = null;
+let forceApi = false;
+let minScore = 85;
 
+// Parse arguments
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--keyword' && i + 1 < args.length) {
-    targetKeyword = args[i + 1];
+  if ((args[i] === '--keyword' || args[i] === '-k') && i + 1 < args.length) {
+    keyword = args[i + 1];
     i++; // Skip the next argument as it's the keyword
-  } else if (args[i] === '--all') {
-    improveAll = true;
-  } else if (args[i] === '--min-score' && i + 1 < args.length) {
-    minScore = parseInt(args[i + 1]);
-    i++; // Skip the next argument as it's the score
+  } else if (args[i] === '--force-api') {
+    forceApi = true;
   } else if (args[i].startsWith('--min-score=')) {
-    minScore = parseInt(args[i].split('=')[1]);
+    const scoreValue = parseInt(args[i].split('=')[1], 10);
+    if (!isNaN(scoreValue) && scoreValue > 0 && scoreValue <= 100) {
+      minScore = scoreValue;
+    }
+  } else if (args[i] === '--help' || args[i] === '-h') {
+    console.log(`
+Content SEO Optimization Script
+
+Usage: node ${path.basename(__filename)} --keyword "your keyword" [options]
+Options:
+  --keyword, -k     The keyword to optimize content for (required)
+  --force-api       Force use of real APIs instead of mock clients
+  --min-score=N     Set minimum SEO score threshold (default: 85)
+  --help, -h        Show this help message
+    `);
+    process.exit(0);
   }
 }
 
-async function main() {
+// Check if keyword is provided
+if (!keyword) {
+  console.error('[ERROR] Keyword is required. Use --keyword "your keyword"');
+  process.exit(1);
+}
+
+/**
+ * Main function to optimize content for SEO
+ */
+async function improveContent(keyword, options = {}) {
+  const { forceApi = false, minScore = 85 } = options;
+  console.log(`[INFO] Optimizing content for SEO: "${keyword}" (min score: ${minScore})`);
+  
   try {
-    console.log('Starting content improvement process...');
-    
-    await workflowService.initialize();
-    
-    if (improveAll) {
-      // Improve all content
-      console.log(`Improving all content with SEO score below ${minScore}...`);
-      const results = await workflowService.batchImproveAllContent(minScore);
-      
-      console.log('\nImprovement Results:');
-      console.log('====================');
-      
-      if (results.length === 0) {
-        console.log('No content needed improvement (all content is above the minimum SEO score).');
-      } else {
-        for (const result of results) {
-          console.log(`"${result.keyword}": Score improved from ${result.oldScore} to ${result.newScore}`);
-        }
-        
-        console.log(`\nSuccessfully improved ${results.length} piece(s) of content.`);
-      }
-    } else if (targetKeyword) {
-      // Improve specific keyword
-      console.log(`Improving content for keyword: "${targetKeyword}"`);
-      const result = await workflowService.improveExistingContent(targetKeyword);
-      
-      if (result.improvementsMade) {
-        const oldScore = result.previousSeoAssessment?.overallScore || 0;
-        const newScore = result.seoAssessment?.overallScore || 0;
-        
-        console.log('\nImprovement Results:');
-        console.log('====================');
-        console.log(`SEO Score: ${oldScore} → ${newScore} (${newScore - oldScore > 0 ? '+' : ''}${newScore - oldScore} points)`);
-        
-        if (result.seoRecommendations?.prioritizedActions) {
-          console.log('\nRemaining Recommendations:');
-          const mediumPriority = result.seoRecommendations.prioritizedActions.filter(a => a.priority === 'Medium');
-          
-          if (mediumPriority.length > 0) {
-            console.log('Medium Priority:');
-            mediumPriority.forEach(action => {
-              console.log(`- ${action.issue}`);
-            });
-          } else {
-            console.log('No medium priority issues remaining.');
-          }
-        }
-      } else {
-        console.log(`Content for "${targetKeyword}" is already optimized (score: ${result.seoScore || result.seoAssessment?.overallScore || 'unknown'})`);
-      }
-    } else {
-      console.log('Please specify a keyword with --keyword "your keyword" or use --all to improve all content.');
-      console.log('Additional options:');
-      console.log('  --min-score=N    Only improve content with SEO score below N (default: 85)');
-      process.exit(1);
+    // Set force API flag if specified
+    if (forceApi) {
+      console.log('[INFO] Forcing to use API data even when cache exists');
+      anthropicService.setForceApi(true);
+      seoQualityService.setForceApi(true);
     }
     
-    console.log('\nContent improvement process completed successfully!');
+    // Create output directory if it doesn't exist
+    const outputDir = path.join(process.cwd(), 'output', 'research');
+    await fs.mkdir(outputDir, { recursive: true });
+    
+    // Load enhanced content
+    const slug = slugify(keyword);
+    const enhancedPath = path.join(outputDir, `${slug}-anthropic-enhanced.json`);
+    
+    console.log(`[INFO] Loading enhanced content from: ${enhancedPath}`);
+    const enhancedContent = JSON.parse(await fs.readFile(enhancedPath, 'utf8'));
+    
+    // Optimize content for SEO
+    console.log(`[INFO] Optimizing content for SEO with Anthropic for "${keyword}"`);
+    const optimizedContent = await anthropicService.optimizeContentForSeo(
+      keyword,
+      enhancedContent
+    );
+    
+    // Evaluate SEO quality
+    console.log(`[INFO] Evaluating SEO quality for "${keyword}"`);
+    const seoScore = await seoQualityService.evaluateContent(keyword, optimizedContent);
+    
+    console.log(`[INFO] SEO score: ${seoScore.score} (minimum: ${minScore})`);
+    
+    // If score is below minimum, try to improve it
+    let finalContent = optimizedContent;
+    let attempts = 1;
+    const maxAttempts = 3;
+    
+    while (seoScore.score < minScore && attempts < maxAttempts) {
+      console.log(`[INFO] SEO score below minimum. Attempt ${attempts}/${maxAttempts} to improve...`);
+      
+      // Improve content based on SEO feedback
+      finalContent = await anthropicService.improveContentWithSeoFeedback(
+        keyword,
+        finalContent,
+        seoScore.feedback
+      );
+      
+      // Re-evaluate SEO quality
+      const newScore = await seoQualityService.evaluateContent(keyword, finalContent);
+      console.log(`[INFO] New SEO score: ${newScore.score} (minimum: ${minScore})`);
+      
+      if (newScore.score >= minScore) {
+        console.log(`[INFO] SEO score meets minimum requirement`);
+        break;
+      }
+      
+      attempts++;
+    }
+    
+    // Save optimized content
+    const optimizedPath = path.join(outputDir, `${slug}-anthropic-seo-optimized.json`);
+    console.log(`[INFO] Saving optimized content to: ${optimizedPath}`);
+    await fs.writeFile(optimizedPath, JSON.stringify(finalContent, null, 2));
+    
+    console.log(`[SUCCESS] Content optimized successfully for "${keyword}"`);
+    return finalContent;
   } catch (error) {
-    console.error('Error improving content:', error);
+    console.error(`[ERROR] Failed to optimize content: ${error.message}`);
     process.exit(1);
   }
 }
 
-main(); 
+// Run the main function if this script is executed directly
+if (require.main === module) {
+  improveContent(keyword, { forceApi, minScore })
+    .then(() => process.exit(0))
+    .catch(error => {
+      console.error('Unhandled error:', error);
+      process.exit(1);
+    });
+}
+
+module.exports = { improveContent }; 

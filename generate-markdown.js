@@ -14,6 +14,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const workflowService = require('./src/services/workflow.service');
 const markdownGeneratorService = require('./src/services/markdown-generator.service');
+const imageGenerationService = require('./src/services/image-generation.service');
 const localStorage = require('./src/utils/local-storage');
 const config = require('./src/config');
 const slugify = require('./src/utils/slugify');
@@ -26,6 +27,7 @@ async function main() {
     // Initialize services
     await workflowService.initialize();
     await markdownGeneratorService.initialize();
+    await imageGenerationService.initialize();
     
     // Check if we have a specific keyword
     const keyword = process.argv[2];
@@ -61,13 +63,55 @@ async function generateMarkdownForKeyword(keyword) {
       // Load the existing content data
       const contentData = await loadJsonFile(contentFilePath);
       
+      // Generate image for the content if not already present
+      if (!contentData.image || !contentData.image.url) {
+        console.log(`Generating image for "${keyword}"...`);
+        const imageResult = await imageGenerationService.generateImage(keyword, contentData.structure || contentData);
+        
+        if (imageResult && imageResult.imageUrl) {
+          contentData.image = {
+            url: imageResult.imageUrl,
+            alt: `Featured image for ${keyword}`,
+            prompt: imageResult.prompt,
+            source: imageResult.source
+          };
+          
+          // Save the updated content data with image
+          await fs.writeFile(contentFilePath, JSON.stringify(contentData, null, 2), 'utf8');
+          console.log(`Image generated and saved for "${keyword}"`);
+        }
+      } else {
+        console.log(`Image already exists for "${keyword}": ${contentData.image.url}`);
+      }
+      
       // Generate the markdown
-      await markdownGeneratorService.generateMarkdown(keyword, contentData);
+      await markdownGeneratorService.generateAndSave(keyword, contentData);
       console.log(`Markdown successfully generated for "${keyword}"`);
     } else {
       // Content doesn't exist, need to process the keyword first
       console.log(`Content data for "${keyword}" not found. Processing keyword...`);
       const result = await workflowService.processKeyword(keyword);
+      
+      // Generate image for the processed content
+      if (result && result.structure) {
+        console.log(`Generating image for newly processed "${keyword}"...`);
+        const imageResult = await imageGenerationService.generateImage(keyword, result.structure);
+        
+        if (imageResult && imageResult.imageUrl) {
+          result.image = {
+            url: imageResult.imageUrl,
+            alt: `Featured image for ${keyword}`,
+            prompt: imageResult.prompt,
+            source: imageResult.source
+          };
+          
+          // Save the updated content data with image
+          const updatedContentFilePath = path.join(config.paths.content, `${slug}-content.json`);
+          await fs.writeFile(updatedContentFilePath, JSON.stringify(result, null, 2), 'utf8');
+          console.log(`Image generated and saved for "${keyword}"`);
+        }
+      }
+      
       console.log(`Keyword "${keyword}" processed and markdown generated`);
     }
   } catch (error) {
@@ -110,9 +154,30 @@ async function generateMarkdownForAllKeywords() {
           continue;
         }
         
+        // Generate image for the content if not already present
+        if (!contentData.image || !contentData.image.url) {
+          console.log(`Generating image for "${keyword}"...`);
+          const imageResult = await imageGenerationService.generateImage(keyword, contentData.structure || contentData);
+          
+          if (imageResult && imageResult.imageUrl) {
+            contentData.image = {
+              url: imageResult.imageUrl,
+              alt: `Featured image for ${keyword}`,
+              prompt: imageResult.prompt,
+              source: imageResult.source
+            };
+            
+            // Save the updated content data with image
+            await fs.writeFile(contentFilePath, JSON.stringify(contentData, null, 2), 'utf8');
+            console.log(`Image generated and saved for "${keyword}"`);
+          }
+        } else {
+          console.log(`Image already exists for "${keyword}": ${contentData.image.url}`);
+        }
+        
         // Generate the markdown
         console.log(`Generating markdown for "${keyword}"`);
-        await markdownGeneratorService.generateMarkdown(keyword, contentData);
+        await markdownGeneratorService.generateAndSave(keyword, contentData);
         console.log(`Markdown successfully generated for "${keyword}"`);
       } catch (error) {
         console.error(`Error processing content file ${contentFile}:`, error);

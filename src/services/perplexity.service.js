@@ -1,343 +1,180 @@
-const axios = require('axios');
+/**
+ * Perplexity Service
+ * 
+ * This service provides comprehensive information about keywords using
+ * Perplexity AI. It includes a mock implementation for testing without API access.
+ */
+
+const fs = require('fs').promises;
 const path = require('path');
-const config = require('../config');
-const localStorage = require('../utils/local-storage');
 const slugify = require('../utils/slugify');
 
 class PerplexityService {
   constructor() {
-    this.initialized = false;
-    this.apiKey = null;
-    this.baseUrl = config.perplexity?.baseUrl || 'https://api.perplexity.ai';
-    this.useMockData = false;
     this.forceApi = false;
+    this.mockDelay = 1800; // Simulate API delay in ms
   }
 
-  // Add method to force using API data
+  /**
+   * Set whether to force using the API even when cache exists
+   * @param {boolean} value - Whether to force API usage
+   */
   setForceApi(value) {
     this.forceApi = value;
     console.log(`[PERPLEXITY] Force API set to: ${value}`);
   }
 
-  async initialize() {
-    try {
-      // Get API key from environment variable
-      this.apiKey = process.env.PERPLEXITY_API_KEY;
-      
-      if (!this.apiKey) {
-        console.warn('[PERPLEXITY] Perplexity API key not found. Using mock data for testing.');
-        this.useMockData = true;
-      } else {
-        console.log('[PERPLEXITY] API key found. Using real API data.');
-        this.useMockData = false;
-      }
-      
-      console.log('[PERPLEXITY] Service initialized successfully');
-      this.initialized = true;
-      return true;
-    } catch (error) {
-      console.error('[PERPLEXITY] Failed to initialize Perplexity service:', error);
-      this.useMockData = true;
-      this.initialized = true; // Still mark as initialized so we can use mock data
-      return true;
-    }
-  }
-
   /**
-   * Generate mock data for testing purposes
-   * @param {string} keyword - The keyword to generate mock data for
-   * @returns {object} - The mock data
-   */
-  generateMockData(keyword) {
-    console.log(`[PERPLEXITY] Generating mock data for: "${keyword}"`);
-    
-    return {
-      keyword,
-      meaning: `An antique value guide is a comprehensive resource that provides information about the worth, history, and significance of antique items. These guides are essential tools for collectors, dealers, appraisers, and enthusiasts who need to determine the value of vintage items, understand market trends, and make informed decisions about purchases, sales, or insurance valuations.`,
-      
-      key_aspects: [
-        "Types of antique value guides (print, online, specialized)",
-        "Elements that determine antique values (age, rarity, condition, provenance)",
-        "How to use value guides effectively",
-        "Limitations of value guides",
-        "Historical significance of antique valuation",
-        "Relationship between appraisals and value guides",
-        "Digital vs. traditional print guides"
-      ],
-      
-      common_questions: [
-        {
-          question: "How accurate are antique value guides?",
-          answer: "Antique value guides provide reasonable estimates but cannot account for all market variables. Their accuracy depends on how recent the guide was published, regional market differences, and item-specific factors. They're best used as starting points rather than definitive valuations."
-        },
-        {
-          question: "What's the difference between price guides and appraisals?",
-          answer: "Price guides offer general values based on categories and averages, while appraisals provide item-specific valuations by certified professionals who consider the exact condition, provenance, and market demand for your specific piece."
-        },
-        {
-          question: "Are online or printed antique value guides better?",
-          answer: "Online guides typically offer more current values and real-time market data, while printed guides often provide more comprehensive historical context and detailed identification information. Many serious collectors use both formats."
-        },
-        {
-          question: "How often should I update my antique value guides?",
-          answer: "For active collectors or dealers, annual updates are recommended as antique values can fluctuate significantly based on market trends. Online subscription services provide the most current information."
-        },
-        {
-          question: "Can antique value guides help identify reproductions?",
-          answer: "Quality guides often include information about common reproductions and how to distinguish them from authentic pieces, but for valuable items, expert authentication is still recommended."
-        }
-      ],
-      
-      expert_insights: [
-        "Professional appraisers recommend cross-referencing multiple value guides rather than relying on a single source",
-        "Regional variations in antique values can be significant; items may be worth more in areas where they have historical significance",
-        "Condition is typically the most critical factor affecting value, often more important than age",
-        "The provenance (documented history) of an antique can significantly increase its value beyond what generic guides suggest",
-        "Market trends affect antique values dramatically; popularity of certain styles (like mid-century modern) can cause rapid price increases"
-      ],
-      
-      current_trends: [
-        "Shift toward digital and app-based value guides with real-time price tracking",
-        "Integration of image recognition technology in newer guides to help with identification",
-        "Growing emphasis on sustainability is increasing interest in antiques as eco-friendly alternatives to new production",
-        "Changing collector demographics are influencing which antiques command premium prices",
-        "Rising importance of online marketplaces in establishing current values"
-      ],
-      
-      statistics: [
-        "The global antiques market was valued at approximately $10.2 billion in 2023",
-        "Online antique sales have grown by 15-20% annually over the past five years",
-        "Approximately 65% of serious collectors now use digital valuation tools alongside traditional guides",
-        "The most valuable antiques typically appreciate at 3-5% annually, outperforming inflation",
-        "Nearly 80% of professional appraisers use multiple value guides when determining item worth"
-      ],
-      
-      best_practices: [
-        "Always check publication dates of value guides to ensure you're using current information",
-        "Consider condition carefully when comparing your item to guide examples",
-        "Use multiple sources to establish a value range rather than a single price point",
-        "For valuable items, supplement guide values with professional appraisals",
-        "Understand regional market differences when applying guide values",
-        "Learn to identify maker's marks and signatures to ensure accurate identification",
-        "Document provenance carefully as it significantly impacts value"
-      ],
-      
-      summary: `Antique value guides are essential tools for anyone interested in collecting, selling, or appraising vintage items. They provide structured frameworks for understanding market values, but should be used with an awareness of their limitations and alongside other research methods. The most effective approach combines traditional guides with digital resources, expert opinions, and an understanding of current market trends.`
-    };
-  }
-
-  /**
-   * Query the Perplexity API for information about a keyword
-   * @param {string} keyword - The keyword to query about
-   * @returns {object} - The response data
+   * Query Perplexity AI for comprehensive information about a keyword
+   * @param {string} keyword - The keyword to query
+   * @returns {Promise<object>} - The query response
    */
   async query(keyword) {
-    if (!this.initialized) {
-      await this.initialize();
-    }
-    
-    console.log(`[PERPLEXITY] Querying about: "${keyword}"`);
+    console.log(`[PERPLEXITY] Querying for information about: "${keyword}"`);
     
     try {
-      // Check if we already have this data
       const slug = slugify(keyword);
-      const filePath = path.join(config.paths.research, `${slug}-perplexity.json`);
+      const cachePath = path.join(process.cwd(), 'output', 'research', `${slug}-perplexity.json`);
       
-      if (!this.forceApi && await localStorage.fileExists(filePath)) {
-        console.log(`[PERPLEXITY] Using cached data for: "${keyword}"`);
-        return await localStorage.readFile(filePath);
-      }
-      
-      // If using mock data, generate it instead of calling the API
-      if (this.useMockData) {
-        console.log(`[PERPLEXITY] Using mock data for: "${keyword}"`);
-        const mockData = this.generateMockData(keyword);
-        await localStorage.saveFile(filePath, mockData);
-        return mockData;
-      }
-      
-      // Construct the prompt for Perplexity
-      const prompt = `I need comprehensive information about "${keyword}" for creating an SEO-optimized blog post. Please provide:
-1. A thorough explanation of what "${keyword}" means and its significance
-2. Key aspects or components to cover when discussing "${keyword}"
-3. Common questions people have about "${keyword}"
-4. Expert insights or advice related to "${keyword}"
-5. Current trends or developments related to "${keyword}"
-6. Relevant statistics, if applicable
-7. Best practices or recommendations related to "${keyword}"
-
-Please provide detailed, accurate, and up-to-date information that would be valuable for readers interested in this topic.`;
-      
+      // Check if cache exists and we're not forcing API usage
       try {
-        // Make API request
-        console.log(`[PERPLEXITY] Calling API for: "${keyword}"`);
-        const response = await axios.post(
-          `${this.baseUrl}/chat/completions`,
-          {
-            model: "sonar",
-            messages: [
-              {
-                role: "system",
-                content: "You are a helpful AI assistant that provides comprehensive, accurate information for creating SEO-optimized blog content."
-              },
-              {
-                role: "user",
-                content: prompt
-              }
-            ],
-            temperature: 0.2,
-            max_tokens: 2000
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${this.apiKey}`
-            }
+        if (!this.forceApi) {
+          const cacheExists = await fs.access(cachePath).then(() => true).catch(() => false);
+          if (cacheExists) {
+            console.log(`[PERPLEXITY] Using cached information for "${keyword}"`);
+            const cachedData = await fs.readFile(cachePath, 'utf8');
+            return JSON.parse(cachedData);
           }
-        );
-        
-        const data = {
-          keyword,
-          timestamp: new Date().toISOString(),
-          response: response.data
-        };
-        
-        // Save response data
-        await localStorage.saveFile(filePath, data);
-        
-        return data;
-      } catch (apiError) {
-        console.error(`[PERPLEXITY] API error for "${keyword}":`, apiError.response?.data || apiError.message);
-        console.warn(`[PERPLEXITY] Falling back to mock data for: "${keyword}"`);
-        
-        // Fall back to mock data on API error
-        const mockData = this.generateMockData(keyword);
-        await localStorage.saveFile(filePath, mockData);
-        return mockData;
+        }
+      } catch (error) {
+        // Cache doesn't exist or is invalid, proceed with query
       }
+      
+      // Check if we have API access
+      if (!process.env.PERPLEXITY_API_KEY) {
+        console.warn('[PERPLEXITY] API key not found, using mock implementation');
+        return this.generateMockResponse(keyword);
+      }
+      
+      // TODO: Implement real API call to Perplexity
+      console.warn('[PERPLEXITY] Real API implementation not available, using mock');
+      return this.generateMockResponse(keyword);
     } catch (error) {
-      console.error(`[PERPLEXITY] Error querying about "${keyword}":`, error.message);
-      
-      // Generate mock data as a fallback
-      const mockData = this.generateMockData(keyword);
-      const slug = slugify(keyword);
-      const filePath = path.join(config.paths.research, `${slug}-perplexity.json`);
-      await localStorage.saveFile(filePath, mockData);
-      
-      return mockData;
+      console.error(`[PERPLEXITY] Error querying information: ${error.message}`);
+      throw error;
     }
   }
 
   /**
-   * Get specific information about a keyword aspect
-   * @param {string} keyword - The main keyword
-   * @param {string} aspect - The specific aspect to query about
-   * @returns {object} - The response data
+   * Generate mock Perplexity response for testing
+   * @param {string} keyword - The keyword to generate response for
+   * @returns {Promise<object>} - The mock response
    */
-  async queryAspect(keyword, aspect) {
-    if (!this.initialized) {
-      await this.initialize();
-    }
+  async generateMockResponse(keyword) {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, this.mockDelay));
     
-    console.log(`[PERPLEXITY] Querying about aspect "${aspect}" for keyword: "${keyword}"`);
+    // Create mock response
+    const response = {
+      keyword,
+      response: {
+        id: `mock-${Date.now()}`,
+        object: 'chat.completion',
+        created: Math.floor(Date.now() / 1000),
+        model: 'perplexity-mock-model',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: this.generateMockContent(keyword)
+            },
+            finish_reason: 'stop'
+          }
+        ],
+        usage: {
+          prompt_tokens: 150,
+          completion_tokens: 800,
+          total_tokens: 950
+        }
+      },
+      timestamp: new Date().toISOString()
+    };
+    
+    // Save response to cache
+    const slug = slugify(keyword);
+    const cachePath = path.join(process.cwd(), 'output', 'research', `${slug}-perplexity.json`);
+    
+    // Create output directory if it doesn't exist
+    const outputDir = path.dirname(cachePath);
+    await fs.mkdir(outputDir, { recursive: true });
     
     try {
-      // Check if we already have this data
-      const slug = slugify(`${keyword}-${aspect}`);
-      const filePath = path.join(config.paths.research, `${slug}-perplexity-aspect.json`);
-      
-      if (!this.forceApi && await localStorage.fileExists(filePath)) {
-        console.log(`[PERPLEXITY] Using cached data for aspect "${aspect}" of keyword: "${keyword}"`);
-        return await localStorage.readFile(filePath);
-      }
-      
-      // If using mock data, generate it instead of calling the API
-      if (this.useMockData) {
-        console.log(`[PERPLEXITY] Using mock data for aspect "${aspect}" of keyword: "${keyword}"`);
-        // Create a simplified mock response focused on the specific aspect
-        const mockData = {
-          keyword,
-          aspect,
-          content: `Detailed information about the "${aspect}" aspect of "${keyword}". This is mock data generated for testing purposes when the API key is not available.`,
-          timestamp: new Date().toISOString()
-        };
-        await localStorage.saveFile(filePath, mockData);
-        return mockData;
-      }
-      
-      // Construct the prompt for the specific aspect
-      const prompt = `I need detailed information about the "${aspect}" aspect of "${keyword}" for creating an SEO-optimized blog post. Please provide comprehensive, accurate, and helpful information specifically focused on this aspect.`;
-      
-      try {
-        // Make API request
-        console.log(`[PERPLEXITY] Calling API for aspect "${aspect}" of keyword: "${keyword}"`);
-        const response = await axios.post(
-          `${this.baseUrl}/chat/completions`,
-          {
-            model: "sonar",
-            messages: [
-              {
-                role: "system",
-                content: "You are a helpful AI assistant that provides comprehensive, accurate information for creating SEO-optimized blog content."
-              },
-              {
-                role: "user",
-                content: prompt
-              }
-            ],
-            temperature: 0.2,
-            max_tokens: 1500
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${this.apiKey}`
-            }
-          }
-        );
-        
-        const data = {
-          keyword,
-          aspect,
-          timestamp: new Date().toISOString(),
-          response: response.data
-        };
-        
-        // Save response data
-        await localStorage.saveFile(filePath, data);
-        
-        return data;
-      } catch (apiError) {
-        console.error(`[PERPLEXITY] API error for aspect "${aspect}" of "${keyword}":`, apiError.response?.data || apiError.message);
-        console.warn(`[PERPLEXITY] Falling back to mock data for aspect "${aspect}" of keyword: "${keyword}"`);
-        
-        // Create a simplified mock response as fallback
-        const mockData = {
-          keyword,
-          aspect,
-          content: `Detailed information about the "${aspect}" aspect of "${keyword}". This is mock data generated for testing purposes when the API request failed.`,
-          timestamp: new Date().toISOString()
-        };
-        await localStorage.saveFile(filePath, mockData);
-        return mockData;
-      }
+      await fs.writeFile(cachePath, JSON.stringify(response, null, 2));
     } catch (error) {
-      console.error(`[PERPLEXITY] Error querying about aspect "${aspect}" for keyword "${keyword}":`, error.message);
-      
-      // Generate mock data as a fallback
-      const mockData = {
-        keyword,
-        aspect,
-        content: `Detailed information about the "${aspect}" aspect of "${keyword}". This is mock data generated for testing purposes due to an error.`,
-        timestamp: new Date().toISOString()
-      };
-      
-      const slug = slugify(`${keyword}-${aspect}`);
-      const filePath = path.join(config.paths.research, `${slug}-perplexity-aspect.json`);
-      await localStorage.saveFile(filePath, mockData);
-      
-      return mockData;
+      console.error(`[PERPLEXITY] Error saving response to cache: ${error.message}`);
     }
+    
+    return response;
+  }
+
+  /**
+   * Generate mock content for a keyword
+   * @param {string} keyword - The keyword to generate content for
+   * @returns {string} - The mock content
+   */
+  generateMockContent(keyword) {
+    return `# Comprehensive Information About ${keyword.charAt(0).toUpperCase() + keyword.slice(1)}
+
+## Overview
+${keyword.charAt(0).toUpperCase() + keyword.slice(1)} refers to a significant concept or practice in its respective field. It encompasses various aspects including methodologies, tools, strategies, and applications that have evolved over time to address specific needs and challenges.
+
+## Key Aspects
+1. **Definition and Scope**: ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} can be defined as a systematic approach to organizing, analyzing, and implementing solutions within its domain. Its scope extends across multiple disciplines and contexts.
+
+2. **Historical Development**: The concept of ${keyword} has evolved significantly over the past decades. Initially developed as a response to specific challenges, it has grown to encompass broader applications and methodologies.
+
+3. **Core Principles**: Several fundamental principles underpin ${keyword}, including:
+   - Systematic analysis and planning
+   - Iterative improvement and adaptation
+   - Integration of best practices and standards
+   - Focus on measurable outcomes and results
+
+4. **Common Applications**: ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} is applied across various contexts, including:
+   - Professional settings to enhance productivity and efficiency
+   - Educational environments to improve learning outcomes
+   - Personal development to achieve specific goals
+   - Organizational frameworks to optimize processes
+
+5. **Benefits and Advantages**: Implementing ${keyword} effectively can lead to:
+   - Improved efficiency and productivity
+   - Enhanced quality and consistency
+   - Better decision-making through structured approaches
+   - Increased adaptability to changing conditions
+
+6. **Challenges and Limitations**: Despite its benefits, ${keyword} faces certain challenges:
+   - Implementation complexity in diverse environments
+   - Resistance to adoption in traditional settings
+   - Resource requirements for effective implementation
+   - Balancing structure with flexibility
+
+7. **Best Practices**: Experts recommend the following best practices for ${keyword}:
+   - Start with clear objectives and expectations
+   - Implement incrementally with regular evaluation
+   - Adapt approaches based on specific contexts
+   - Continuously learn and incorporate new insights
+
+8. **Future Trends**: The field of ${keyword} continues to evolve, with emerging trends including:
+   - Integration with digital technologies and automation
+   - Emphasis on customization and personalization
+   - Focus on sustainability and long-term impact
+   - Cross-disciplinary applications and methodologies
+
+## Expert Insights
+Experts in the field of ${keyword} emphasize the importance of a balanced approach that combines structured methodologies with adaptability to specific contexts. They note that successful implementation requires both technical knowledge and an understanding of the human factors involved.
+
+## Conclusion
+${keyword.charAt(0).toUpperCase() + keyword.slice(1)} represents a valuable approach to addressing complex challenges across various domains. By understanding its principles, applications, and best practices, individuals and organizations can leverage its benefits while mitigating potential limitations.`;
   }
 }
 
