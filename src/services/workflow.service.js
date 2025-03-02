@@ -120,7 +120,7 @@ class WorkflowService {
       // Check if content exists in cache
       try {
         const cacheExists = await fs.access(cachePath).then(() => true).catch(() => false);
-        if (cacheExists) {
+        if (!this.forceApi && cacheExists) {
           console.log(`[WORKFLOW] Found cached content for "${keyword}"`);
           const cachedContent = await fs.readFile(cachePath, 'utf8');
           return JSON.parse(cachedContent);
