@@ -51,16 +51,16 @@ async function generateMarkdown(keyword, forceApi = false) {
     
     // Create output directories if they don't exist
     const outputDir = path.join(process.cwd(), 'output');
-    const researchDir = path.join(outputDir, 'research');
+    const optimizedDir = path.join(outputDir, 'optimized');
     const markdownDir = path.join(outputDir, 'markdown');
     
     await fs.mkdir(outputDir, { recursive: true });
-    await fs.mkdir(researchDir, { recursive: true });
+    await fs.mkdir(optimizedDir, { recursive: true });
     await fs.mkdir(markdownDir, { recursive: true });
     
     // Load optimized content
     const slug = slugify(keyword);
-    const optimizedPath = path.join(researchDir, `${slug}-anthropic-seo-optimized.json`);
+    const optimizedPath = path.join(optimizedDir, `${slug}.json`);
     
     console.log(`[INFO] Loading optimized content from: ${optimizedPath}`);
     const optimizedContent = JSON.parse(await fs.readFile(optimizedPath, 'utf8'));

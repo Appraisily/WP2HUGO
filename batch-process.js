@@ -25,7 +25,8 @@ const options = {
   filename: 'keywords.txt',
   forceApi: false,
   skipImage: false,
-  minScore: 0
+  minScore: 0,
+  singleKeyword: null
 };
 
 // Process arguments
@@ -38,7 +39,12 @@ for (let i = 0; i < args.length; i++) {
   } else if (arg === '--min-score') {
     options.minScore = parseInt(args[++i]) || 0;
   } else if (!arg.startsWith('--')) {
-    options.filename = arg;
+    // Check if this looks like a filename or a keyword
+    if (arg.endsWith('.txt') || arg.includes('/') || arg.includes('\\')) {
+      options.filename = arg;
+    } else {
+      options.singleKeyword = arg;
+    }
   }
 }
 
@@ -101,7 +107,17 @@ async function processKeyword(keyword, options) {
  */
 async function runScript(scriptName, args = []) {
   const scriptPath = path.join(process.cwd(), scriptName);
-  const command = `node "${scriptPath}" ${args.filter(Boolean).join(' ')}`;
+  
+  // Properly quote the keyword if it contains spaces
+  const processedArgs = args.map(arg => {
+    // If the argument contains spaces and is not already quoted, add quotes
+    if (arg && arg.includes(' ') && !arg.startsWith('"') && !arg.startsWith("'")) {
+      return `"${arg}"`;
+    }
+    return arg;
+  });
+  
+  const command = `node "${scriptPath}" ${processedArgs.filter(Boolean).join(' ')}`;
   
   try {
     console.log(`[EXEC] ${command}`);
@@ -134,6 +150,13 @@ async function readKeywordsFromFile(filename) {
  */
 async function processKeywordsFromFile(options) {
   try {
+    // If a single keyword is provided, process just that one
+    if (options.singleKeyword) {
+      console.log(`[INFO] Processing single keyword: "${options.singleKeyword}"`);
+      await processKeyword(options.singleKeyword, options);
+      return;
+    }
+    
     console.log(`[INFO] Reading keywords from: ${options.filename}`);
     const keywords = await readKeywordsFromFile(options.filename);
     
