@@ -20,6 +20,9 @@ class KeywordResearchService {
       if (!this.apiKey) {
         console.warn('[KEYWORD-RESEARCH] KWRDS API key not found. Using mock data for testing.');
         this.useMockData = true;
+      } else {
+        console.log('[KEYWORD-RESEARCH] API key found. Using real API data.');
+        this.useMockData = false;
       }
       
       console.log('[KEYWORD-RESEARCH] Service initialized successfully');

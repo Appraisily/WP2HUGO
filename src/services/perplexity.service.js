@@ -20,6 +20,9 @@ class PerplexityService {
       if (!this.apiKey) {
         console.warn('[PERPLEXITY] Perplexity API key not found. Using mock data for testing.');
         this.useMockData = true;
+      } else {
+        console.log('[PERPLEXITY] API key found. Using real API data.');
+        this.useMockData = false;
       }
       
       console.log('[PERPLEXITY] Service initialized successfully');
