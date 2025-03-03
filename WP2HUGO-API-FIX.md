@@ -13,6 +13,11 @@ This document describes the changes made to fix the WP2HUGO API service and how 
 
 2. **API Endpoint Issue**: The `/api/hugo/process` endpoint wasn't properly processing the keyword parameter from the request body.
 
+3. **Missing Method Error**: The service was failing with an error after the above fixes:
+   ```
+   "keywordResearchService.getKeywordData is not a function"
+   ```
+
 ## Solutions Applied
 
 ### 1. Sheets Service Fix
@@ -31,6 +36,14 @@ We updated the `/api/hugo/process` endpoint and related services to properly han
 1. Modified the endpoint in `server.js` to extract the keyword from the request body
 2. Updated `hugo-processor.service.js` to pass the keyword to the workflow service
 3. Ensured the service can process a single keyword directly
+
+### 3. Keyword Research Service Fix
+
+We added the missing `getKeywordData` method to the `keyword-research.service.js` file, which was being called by the data collector but didn't exist. This method:
+
+1. Calls the existing methods like `researchKeyword`, `getRelatedKeywords`, and `getSerpData`
+2. Combines the results into a comprehensive keyword data object
+3. Includes fallback to mock data if any of the API calls fail
 
 ## How to Deploy
 

@@ -121,6 +121,58 @@ class KeywordResearchService {
   }
 
   /**
+   * Get keyword data - main method called by data collector
+   * @param {string} keyword - The keyword to research
+   * @returns {object} - The keyword data
+   */
+  async getKeywordData(keyword) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    
+    console.log(`[KEYWORD-RESEARCH] Getting keyword data for: "${keyword}"`);
+    
+    try {
+      // Research the keyword
+      const researchData = await this.researchKeyword(keyword);
+      
+      // Get related keywords
+      const relatedKeywords = await this.getRelatedKeywords(keyword);
+      
+      // Get SERP data
+      let serpData = null;
+      try {
+        serpData = await this.getSerpData(keyword);
+      } catch (error) {
+        console.warn(`[KEYWORD-RESEARCH] Error getting SERP data: ${error.message}`);
+        serpData = { results: [] };
+      }
+      
+      // Combine all data
+      return {
+        keyword,
+        researchData,
+        relatedKeywords,
+        serp: serpData,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error(`[KEYWORD-RESEARCH] Error getting keyword data: ${error.message}`);
+      
+      // Return mock data as fallback
+      const mockResearch = this.generateMockData(keyword);
+      return {
+        keyword,
+        researchData: mockResearch,
+        relatedKeywords: mockResearch.related_keywords,
+        serp: { results: [] },
+        timestamp: new Date().toISOString(),
+        isMock: true
+      };
+    }
+  }
+
+  /**
    * Research keyword data
    * @param {string} keyword - The keyword to research
    * @returns {object} - The keyword data

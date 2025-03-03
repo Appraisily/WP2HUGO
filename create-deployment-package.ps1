@@ -29,9 +29,16 @@ Copy-Item -Path "src/services/hugo-processor.service.js" -Destination "$deployDi
 Write-Output "Copying workflow.service.js..."
 Copy-Item -Path "src/services/hugo/workflow.service.js" -Destination "$deployDir/src/services/hugo/workflow.service.js"
 
+Write-Output "Copying keyword-research.service.js..."
+Copy-Item -Path "src/services/keyword-research.service.js" -Destination "$deployDir/src/services/keyword-research.service.js"
+
+Write-Output "Copying data-collector.service.js..."
+Copy-Item -Path "src/services/hugo/data-collector.service.js" -Destination "$deployDir/src/services/hugo/data-collector.service.js"
+
 # Copy documentation
 Write-Output "Copying documentation..."
-Copy-Item -Path "WP2HUGO-API-FIX.md" -Destination "$deployDir/README.md"
+Copy-Item -Path "WP2HUGO-API-FIX.md" -Destination "$deployDir/WP2HUGO-API-FIX.md"
+Copy-Item -Path "README-DEPLOYMENT.md" -Destination "$deployDir/README.md"
 
 # Create a zip file
 Write-Output "Creating zip file..."
