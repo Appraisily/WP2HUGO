@@ -123,9 +123,10 @@ class KeywordResearchService {
   /**
    * Get keyword data - main method called by data collector
    * @param {string} keyword - The keyword to research
+   * @param {boolean} allowMockFallback - Whether to allow fallback to mock data
    * @returns {object} - The keyword data
    */
-  async getKeywordData(keyword) {
+  async getKeywordData(keyword, allowMockFallback = true) {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -134,18 +135,28 @@ class KeywordResearchService {
     
     try {
       // Research the keyword
-      const researchData = await this.researchKeyword(keyword);
+      const researchData = await this.researchKeyword(keyword, allowMockFallback);
       
-      // Get related keywords
-      const relatedKeywords = await this.getRelatedKeywords(keyword);
-      
-      // Get SERP data
+      // Get related keywords with retries
+      let relatedKeywords = null;
       let serpData = null;
+      
       try {
-        serpData = await this.getSerpData(keyword);
+        // Attempt to get related keywords with retries
+        relatedKeywords = await this.getRelatedKeywordsWithRetry(keyword);
       } catch (error) {
-        console.warn(`[KEYWORD-RESEARCH] Error getting SERP data: ${error.message}`);
-        serpData = { results: [] };
+        console.error(`[KEYWORD-RESEARCH] Failed to get related keywords after multiple retries: ${error.message}`);
+        // Don't fall back to mock data, throw the error to be handled by the caller
+        throw new Error(`Could not retrieve related keywords: ${error.message}`);
+      }
+      
+      // Get SERP data with retries
+      try {
+        serpData = await this.getSerpDataWithRetry(keyword);
+      } catch (error) {
+        console.error(`[KEYWORD-RESEARCH] Failed to get SERP data after multiple retries: ${error.message}`);
+        // Don't fall back to mock data, throw the error to be handled by the caller
+        throw new Error(`Could not retrieve SERP data: ${error.message}`);
       }
       
       // Combine all data
@@ -159,25 +170,92 @@ class KeywordResearchService {
     } catch (error) {
       console.error(`[KEYWORD-RESEARCH] Error getting keyword data: ${error.message}`);
       
-      // Return mock data as fallback
-      const mockResearch = this.generateMockData(keyword);
-      return {
-        keyword,
-        researchData: mockResearch,
-        relatedKeywords: mockResearch.related_keywords,
-        serp: { results: [] },
-        timestamp: new Date().toISOString(),
-        isMock: true
-      };
+      // Check if we're explicitly allowed to use mock data
+      if (this.useMockData || allowMockFallback) {
+        console.warn(`[KEYWORD-RESEARCH] Using mock data as configured (allowMockFallback: ${allowMockFallback})`);
+        const mockResearch = this.generateMockData(keyword);
+        return {
+          keyword,
+          researchData: mockResearch,
+          relatedKeywords: mockResearch.related_keywords,
+          serp: { results: [] },
+          timestamp: new Date().toISOString(),
+          isMock: true
+        };
+      }
+      
+      // Otherwise, propagate the error
+      throw error;
     }
+  }
+
+  /**
+   * Get related keywords with retry logic
+   * @param {string} keyword - The keyword to get related keywords for
+   * @param {number} maxRetries - Maximum number of retry attempts
+   * @returns {Promise<Array>} - The related keywords
+   */
+  async getRelatedKeywordsWithRetry(keyword, maxRetries = 3) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[KEYWORD-RESEARCH] Getting related keywords for: "${keyword}" (Attempt ${attempt}/${maxRetries})`);
+        return await this.getRelatedKeywords(keyword);
+      } catch (error) {
+        lastError = error;
+        console.warn(`[KEYWORD-RESEARCH] Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+        
+        if (attempt < maxRetries) {
+          // Wait before next retry (exponential backoff)
+          const delay = 1000 * Math.pow(2, attempt - 1);
+          console.log(`[KEYWORD-RESEARCH] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    // If we got here, all retries failed
+    throw lastError;
+  }
+
+  /**
+   * Get SERP data with retry logic
+   * @param {string} keyword - The keyword to get SERP data for
+   * @param {number} maxRetries - Maximum number of retry attempts
+   * @returns {Promise<Object>} - The SERP data
+   */
+  async getSerpDataWithRetry(keyword, maxRetries = 3) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[KEYWORD-RESEARCH] Getting SERP data for: "${keyword}" (Attempt ${attempt}/${maxRetries})`);
+        return await this.getSerpData(keyword);
+      } catch (error) {
+        lastError = error;
+        console.warn(`[KEYWORD-RESEARCH] Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+        
+        if (attempt < maxRetries) {
+          // Wait before next retry (exponential backoff)
+          const delay = 1000 * Math.pow(2, attempt - 1);
+          console.log(`[KEYWORD-RESEARCH] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    // If we got here, all retries failed
+    throw lastError;
   }
 
   /**
    * Research keyword data
    * @param {string} keyword - The keyword to research
+   * @param {boolean} allowMockFallback - Whether to allow fallback to mock data
    * @returns {object} - The keyword data
    */
-  async researchKeyword(keyword) {
+  async researchKeyword(keyword, allowMockFallback = false) {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -221,16 +299,21 @@ class KeywordResearchService {
     } catch (error) {
       console.error(`[KEYWORD-RESEARCH] Error researching keyword "${keyword}":`, error);
       
-      // If API error, use mock data
-      console.log(`[KEYWORD-RESEARCH] Generating mock data due to API error`);
-      const mockData = this.generateMockData(keyword);
+      // Only use mock data if explicitly allowed
+      if (this.useMockData || allowMockFallback) {
+        console.log(`[KEYWORD-RESEARCH] Generating mock data due to API error (fallback allowed: ${allowMockFallback})`);
+        const mockData = this.generateMockData(keyword);
+        
+        // Save mock data
+        const slug = slugify(keyword);
+        const filePath = path.join(config.paths.research, `${slug}-kwrds.json`);
+        await localStorage.saveFile(filePath, mockData);
+        
+        return mockData;
+      }
       
-      // Save mock data
-      const slug = slugify(keyword);
-      const filePath = path.join(config.paths.research, `${slug}-kwrds.json`);
-      await localStorage.saveFile(filePath, mockData);
-      
-      return mockData;
+      // Otherwise, propagate the error
+      throw new Error(`API error while researching keyword "${keyword}": ${error.message}`);
     }
   }
 

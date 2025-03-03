@@ -85,6 +85,30 @@ async function initialize() {
     }
   });
 
+  // New endpoint for generating markdown from a keyword
+  app.post('/api/hugo/generate-markdown', async (req, res) => {
+    try {
+      // Extract keyword from request body
+      const { keyword } = req.body;
+      if (!keyword) {
+        return res.status(400).json({
+          success: false,
+          error: 'Keyword is required'
+        });
+      }
+      
+      console.log(`[SERVER] Generating markdown content for keyword: ${keyword}`);
+      const result = await hugoProcessor.generateMarkdown(keyword);
+      res.json(result);
+    } catch (error) {
+      console.error('[SERVER] Error generating markdown content:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
+
   // New endpoint for batch keyword processing
   app.post('/api/keywords/process-batch', async (req, res) => {
     try {

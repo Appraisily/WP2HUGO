@@ -95,111 +95,112 @@ class WorkflowService {
       const folderPath = `${slug}`;
 
       // Collect data
-      const collectedData = await dataCollector.collectData(keyword, folderPath);
+      try {
+        const collectedData = await dataCollector.collectData(keyword, folderPath);
+        
+        // Once data is collected successfully, proceed with the rest of the workflow
+        console.log('[HUGO] Analyzing collected data');
+        const contentAnalysis = await contentAnalyzer.analyzeKeyword(keyword, collectedData);
+        
+        // Variable to store valuation response
+        let valuationResponse = null;
 
-      // Analyze collected data
-      console.log('[HUGO] Analyzing collected data');
-      const contentAnalysis = await contentAnalyzer.analyzeKeyword(keyword, collectedData);
-
-      // Variable to store valuation response
-      let valuationResponse = null;
-
-      // Send valuation description to valuation agent if available
-      if (contentAnalysis.valuation_description) {
-        try {
-          console.log('[HUGO] Sending to valuation agent:', contentAnalysis.valuation_description);
-          valuationResponse = await axios.post(
-            'https://valuer-agent-856401495068.us-central1.run.app/api/find-value-range',
-            { text: contentAnalysis.valuation_description },
-            { headers: { 'Content-Type': 'application/json' } }
-          );
-          
-          // Log the value range response
-          console.log('[HUGO] Received valuation range:', {
-            minValue: valuationResponse.data.minValue,
-            maxValue: valuationResponse.data.maxValue,
-            mostLikelyValue: valuationResponse.data.mostLikelyValue
-          });
-          
-          // Store valuation response
-          await contentStorage.storeContent(
-            `${folderPath}/research/valuation-data.json`,
-            {
-              description: contentAnalysis.valuation_description,
-              value_range: {
-                min: valuationResponse.data.minValue,
-                max: valuationResponse.data.maxValue,
-                most_likely: valuationResponse.data.mostLikelyValue
+        // Send valuation description to valuation agent if available
+        if (contentAnalysis.valuation_description) {
+          try {
+            console.log('[HUGO] Sending to valuation agent:', contentAnalysis.valuation_description);
+            valuationResponse = await axios.post(
+              'https://valuer-agent-856401495068.us-central1.run.app/api/find-value-range',
+              { text: contentAnalysis.valuation_description },
+              { headers: { 'Content-Type': 'application/json' } }
+            );
+            
+            // Log the value range response
+            console.log('[HUGO] Received valuation range:', {
+              minValue: valuationResponse.data.minValue,
+              maxValue: valuationResponse.data.maxValue,
+              mostLikelyValue: valuationResponse.data.mostLikelyValue
+            });
+            
+            // Store valuation response
+            await contentStorage.storeContent(
+              `${folderPath}/research/valuation-data.json`,
+              {
+                description: contentAnalysis.valuation_description,
+                value_range: {
+                  min: valuationResponse.data.minValue,
+                  max: valuationResponse.data.maxValue,
+                  most_likely: valuationResponse.data.mostLikelyValue
+                },
+                explanation: valuationResponse.data.explanation,
+                auction_results: valuationResponse.data.auctionResults,
+                timestamp: new Date().toISOString()
               },
-              explanation: valuationResponse.data.explanation,
-              auction_results: valuationResponse.data.auctionResults,
-              timestamp: new Date().toISOString()
+              { type: 'valuation_data', keyword }
+            );
+          } catch (error) {
+            console.error('[HUGO] Error getting valuation:', error);
+            // Continue processing even if valuation fails
+          }
+        }
+
+        // Prepare final data object
+        const finalData = {
+          ...collectedData,
+          contentAnalysis,
+          valuation: valuationResponse?.data ? {
+            value_range: {
+              min: valuationResponse.data.minValue,
+              max: valuationResponse.data.maxValue,
+              most_likely: valuationResponse.data.mostLikelyValue
             },
-            { type: 'valuation_data', keyword }
-          );
-        } catch (error) {
-          console.error('[HUGO] Error getting valuation:', error);
-          // Continue processing even if valuation fails
-        }
-      }
+            explanation: valuationResponse.data.explanation,
+            auction_results: valuationResponse.data.auctionResults
+          } : null,
+          metadata: {
+            keyword,
+            processedDate: new Date().toISOString(),
+            status: 'data_collected',
+            has_valuation: Boolean(valuationResponse?.data)
+          }
+        };
 
-      // Prepare final data object
-      const finalData = {
-        ...collectedData,
-        contentAnalysis,
-        valuation: valuationResponse?.data ? {
-          value_range: {
-            min: valuationResponse.data.minValue,
-            max: valuationResponse.data.maxValue,
-            most_likely: valuationResponse.data.mostLikelyValue
-          },
-          explanation: valuationResponse.data.explanation,
-          auction_results: valuationResponse.data.auctionResults
-        } : null,
-        metadata: {
+        // Store collected data in regular path
+        await contentStorage.storeContent(
+          `${folderPath}/collected-data.json`,
+          finalData,
+          { type: 'collected_data', keyword }
+        );
+
+        // Store the same data in a dedicated GCS folder with keyword as filename
+        await contentStorage.storeContent(
+          `seo_keywords/${keyword}.json`,
+          finalData,
+          { type: 'keyword_data', keyword }
+        );
+
+        return {
+          success: true,
           keyword,
-          processedDate: new Date().toISOString(),
-          status: 'data_collected',
-          has_valuation: Boolean(valuationResponse?.data)
-        }
-      };
-
-      // Store collected data in regular path
-      await contentStorage.storeContent(
-        `${folderPath}/collected-data.json`,
-        finalData,
-        { type: 'collected_data', keyword }
-      );
-
-      // Store the same data in a dedicated GCS folder with keyword as filename
-      await contentStorage.storeContent(
-        `seo_keywords/${keyword}.json`,
-        finalData,
-        { type: 'keyword_data', keyword }
-      );
-
-      return {
-        keyword,
-        slug: createSlug(keyword),
-        folderPath,
-        gcsPath: `seo_keywords/${keyword}.json`,
-        dataCollected: {
-          hasKeywordData: Boolean(collectedData.keywordData),
-          hasPaaData: Boolean(collectedData.paaData?.results?.length),
-          hasSerpData: Boolean(collectedData.serpData?.serp?.length),
-          hasPerplexityData: Boolean(collectedData.perplexityData),
-          hasContentAnalysis: Boolean(contentAnalysis),
-          hasValuation: Boolean(valuationResponse?.data)
-        },
-        success: true
-      };
+          message: `Successfully processed keyword: ${keyword}`
+        };
+      } catch (error) {
+        // Handle data collection errors specifically
+        console.error(`[HUGO] Error collecting data for keyword "${keyword}": ${error.message}`);
+        return {
+          success: false,
+          keyword,
+          error: `Data collection failed: ${error.message}`,
+          message: `Failed to process keyword: ${keyword}`
+        };
+      }
 
     } catch (error) {
       console.error('[HUGO] Error processing row:', error);
       return {
-        keyword: row['KWs'],
         success: false,
-        error: error.message
+        error: error.message,
+        message: `Failed to process row: ${error.message}`
       };
     }
   }

@@ -4,6 +4,7 @@ const paaService = require('../paa.service');
 const serpService = require('../serp.service');
 const perplexityService = require('../perplexity.service');
 const { createSlug } = require('../../utils/slug');
+const fs = require('fs');
 
 class DataCollectorService {
   async collectData(keyword, folderPath) {
@@ -45,13 +46,26 @@ class DataCollectorService {
       console.log('[HUGO] No existing keyword data, fetching fresh');
     }
 
-    const data = await keywordResearchService.getKeywordData(keyword);
-    await contentStorage.storeContent(
-      `${folderPath}/research/keyword-data.json`,
-      data,
-      { type: 'keyword_data', keyword }
-    );
-    return data;
+    try {
+      // Try to get real keyword data with explicit instruction to not use mock data
+      const data = await keywordResearchService.getKeywordData(keyword, false); // Pass false to explicitly avoid fallback to mock data
+      console.log('[HUGO] Successfully retrieved keyword data from API');
+      
+      // Store the data if retrieval was successful
+      await contentStorage.storeContent(
+        `${folderPath}/research/keyword-data.json`,
+        data,
+        { type: 'keyword_data', keyword }
+      );
+
+      return data;
+    } catch (error) {
+      // Log the error and propagate it upward
+      console.error(`[HUGO] Failed to get keyword data: ${error.message}`);
+      
+      // Throw a more descriptive error to be handled by the caller
+      throw new Error(`Could not retrieve keyword data for "${keyword}": ${error.message}`);
+    }
   }
 
   async getPaaData(keyword, folderPath) {

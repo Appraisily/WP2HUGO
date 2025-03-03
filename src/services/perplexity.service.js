@@ -205,6 +205,184 @@ Experts in the field of ${keyword} emphasize the importance of a balanced approa
 ## Conclusion
 ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} represents a valuable approach to addressing complex challenges across various domains. By understanding its principles, applications, and best practices, individuals and organizations can leverage its benefits while mitigating potential limitations.`;
   }
+
+  /**
+   * Generate keyword variations for better content coverage
+   * @param {string} keyword - The keyword to generate variations for
+   * @returns {Promise<array>} - Array of keyword variations
+   */
+  async generateKeywordVariations(keyword) {
+    console.log(`[PERPLEXITY] Generating keyword variations for: "${keyword}"`);
+    
+    // Mock implementation for testing
+    const variations = [
+      keyword.toLowerCase(),
+      keyword.toUpperCase(),
+      keyword.split(' ').reverse().join(' '),
+      keyword + ' guide',
+      'best ' + keyword,
+      keyword + ' examples',
+      'how to find ' + keyword,
+      keyword + ' value',
+      'vintage ' + keyword,
+      'modern ' + keyword
+    ];
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return variations;
+  }
+
+  /**
+   * Analyze search intent for the keyword
+   * @param {string} keyword - The keyword to analyze
+   * @returns {Promise<object>} - The intent analysis results
+   */
+  async analyzeSearchIntent(keyword) {
+    console.log(`[PERPLEXITY] Analyzing search intent for: "${keyword}"`);
+    
+    // Mock implementation for testing
+    const intents = ['informational', 'commercial', 'transactional', 'navigational'];
+    const primaryIntent = intents[Math.floor(Math.random() * 2)]; // Usually informational or commercial
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return {
+      primary_intent: primaryIntent,
+      intent_confidence: (Math.random() * 0.3 + 0.7).toFixed(2), // Between 0.7 and 1.0
+      secondary_intents: intents.filter(i => i !== primaryIntent).map(intent => ({
+        intent: intent,
+        confidence: (Math.random() * 0.5).toFixed(2) // Lower confidence for secondary intents
+      })),
+      explanation: `Users searching for "${keyword}" are primarily looking for ${primaryIntent} content about this topic.`
+    };
+  }
+
+  /**
+   * Get contextual expansion for the keyword
+   * @param {string} keyword - The keyword to expand
+   * @returns {Promise<object>} - The contextual expansion data
+   */
+  async getContextualExpansion(keyword) {
+    console.log(`[PERPLEXITY] Getting contextual expansion for: "${keyword}"`);
+    
+    // Mock implementation for testing
+    const categories = ['history', 'functionality', 'types', 'value', 'collecting', 'manufacturers', 'design', 'materials'];
+    const selectedCategories = categories.sort(() => 0.5 - Math.random()).slice(0, 4);
+    
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return {
+      context_categories: selectedCategories,
+      historical_context: `${keyword} have been produced since the late 19th century.`,
+      key_concepts: [
+        "Value factors for " + keyword,
+        "How to identify authentic " + keyword,
+        "Popular makers of " + keyword,
+        "Common materials used in " + keyword
+      ],
+      target_audience: [
+        "Collectors",
+        "Antique enthusiasts",
+        "Interior designers",
+        "Vintage home décor fans"
+      ]
+    };
+  }
+
+  /**
+   * Generate content topics for the keyword
+   * @param {string} keyword - The keyword to generate topics for
+   * @returns {Promise<object>} - The topic generation data
+   */
+  async generateContentTopics(keyword) {
+    console.log(`[PERPLEXITY] Generating content topics for: "${keyword}"`);
+    
+    // Mock implementation for testing
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return {
+      main_topics: [
+        "History of " + keyword,
+        "Types of " + keyword,
+        "How to identify valuable " + keyword,
+        "Collecting " + keyword + " as a hobby",
+        "Maintenance and care for " + keyword
+      ],
+      subtopics: {
+        "History": [
+          "Early development",
+          "Golden era",
+          "Modern revival"
+        ],
+        "Value": [
+          "Rarity factors",
+          "Condition assessment",
+          "Price ranges",
+          "Auction results"
+        ],
+        "Identification": [
+          "Maker's marks",
+          "Authentication methods",
+          "Spotting reproductions"
+        ]
+      },
+      suggested_outline: [
+        "Introduction to " + keyword,
+        "Historical background",
+        "Types and variations",
+        "Value assessment guide",
+        "Collecting tips",
+        "Care and maintenance",
+        "Where to find authentic pieces",
+        "Conclusion"
+      ]
+    };
+  }
+
+  /**
+   * Complement structured data from other sources with additional insights
+   * @param {string} keyword - The keyword for data complementation
+   * @param {object} existingData - Existing structured data to complement
+   * @returns {Promise<object>} - The complementary data
+   */
+  async complementStructuredData(keyword, existingData) {
+    console.log(`[PERPLEXITY] Complementing structured data for: "${keyword}"`);
+    
+    // Mock implementation for testing
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    return {
+      expert_insights: [
+        `${keyword} from the 1920s are generally more valuable than later reproductions.`,
+        `When collecting ${keyword}, condition is the most important factor affecting value.`,
+        `Original packaging can increase the value of ${keyword} by 30-50%.`
+      ],
+      common_misconceptions: [
+        `Not all ${keyword} were handmade; mass production began earlier than many people realize.`,
+        `Age alone doesn't determine the value of ${keyword}; rarity and condition are more important.`,
+        `Many ${keyword} marketed as "antique" are actually reproductions from the 1970s.`
+      ],
+      value_factors: [
+        "Age and provenance",
+        "Manufacturer reputation",
+        "Rarity and uniqueness",
+        "Condition and functionality",
+        "Historical significance"
+      ],
+      market_trends: {
+        current_demand: Math.random() > 0.5 ? "increasing" : "stable",
+        price_trend: Math.random() > 0.7 ? "upward" : "stable",
+        collector_interest: (Math.random() * 5 + 5).toFixed(1) + "/10",
+        investment_potential: Math.random() > 0.6 ? "good" : "moderate"
+      }
+    };
+  }
 }
 
 module.exports = new PerplexityService();
