@@ -16,16 +16,26 @@ Create secrets for all API keys and sensitive configuration:
 
 ```bash
 # Create secrets for API keys
-gcloud secrets create KWRDS_API_KEY --data-file=./kwrds-api-key.txt
-gcloud secrets create OPENAI_API_KEY --data-file=./openai-api-key.txt
-gcloud secrets create ANTHROPIC_API_KEY --data-file=./anthropic-api-key.txt
-gcloud secrets create PERPLEXITY_API_KEY --data-file=./perplexity-api-key.txt
-gcloud secrets create GOOGLE_AI_API_KEY --data-file=./googleai-api-key.txt
+gcloud secrets create kwrds-api-key --data-file=./kwrds-api-key.txt
+gcloud secrets create openai-api-key --data-file=./openai-api-key.txt
+gcloud secrets create anthropic-api-key --data-file=./anthropic-api-key.txt
+gcloud secrets create perplexity-api-key --data-file=./perplexity-api-key.txt
+gcloud secrets create google-ai-api-key --data-file=./googleai-api-key.txt
 
 # For Google Sheets integration (if using)
-gcloud secrets create SERVICE_ACCOUNT_JSON --data-file=./service-account.json
-gcloud secrets create SHEETS_ID --data-file=./sheets-id.txt
+gcloud secrets create service-account-json --data-file=./service-account.json
+gcloud secrets create sheets-id --data-file=./sheets-id.txt
 ```
+
+> **⚠️ Important Note on Secret Names:**
+> 
+> Google Cloud Secret Manager is **case-sensitive** and treats hyphens and underscores as different characters. The WP2HUGO application expects secret names to follow the naming convention in the code.
+> 
+> For example:
+> - In the config file: `serviceAccountJson: 'service-account-json'`
+> - Secret name format: `service-account-json` (lowercase with hyphens)
+> 
+> If you encounter "Secret not found" errors, verify that your actual secret names in Secret Manager match exactly what's expected in the application's config.
 
 ## Step 2: Create a Dockerfile
 
@@ -86,11 +96,13 @@ steps:
       - '--memory=2Gi'
       - '--cpu=2'
       - '--set-env-vars=PORT=8080'
-      - '--set-secrets=KWRDS_API_KEY=KWRDS_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,PERPLEXITY_API_KEY=PERPLEXITY_API_KEY:latest,GOOGLE_AI_API_KEY=GOOGLE_AI_API_KEY:latest'
+      - '--set-secrets=KWRDS_API_KEY=kwrds-api-key:latest,OPENAI_API_KEY=openai-api-key:latest,ANTHROPIC_API_KEY=anthropic-api-key:latest,PERPLEXITY_API_KEY=perplexity-api-key:latest,GOOGLE_AI_API_KEY=google-ai-api-key:latest,SERVICE_ACCOUNT_JSON=service-account-json:latest,SHEETS_ID=sheets-id:latest'
 
 images:
   - 'gcr.io/$PROJECT_ID/wp2hugo'
 ```
+
+> **Note:** Make sure the `--set-secrets` parameter maps environment variable names (e.g., `KWRDS_API_KEY`) to the corresponding secret names in Google Cloud Secret Manager (e.g., `kwrds-api-key`).
 
 ## Step 4: Test Locally with Docker
 

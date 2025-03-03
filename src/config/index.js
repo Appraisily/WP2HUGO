@@ -22,7 +22,7 @@ const config = {
   
   // Secret names for Google Cloud Secret Manager
   secretNames: {
-    serviceAccountJson: 'SERVICE_ACCOUNT_JSON',
+    serviceAccountJson: 'service-account-json',
     sheetsId: 'SHEETS_ID',
     openaiApiKey: 'OPENAI_API_KEY',
     anthropicApiKey: 'ANTHROPIC_API_KEY',

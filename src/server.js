@@ -13,7 +13,11 @@ const workflowService = require('./services/hugo/workflow.service');
 
 async function initializeService(service, name) {
   try {
-    await service.initialize();
+    const result = await service.initialize();
+    if (result === false) {
+      console.warn(`[SERVER] ${name} service initialization returned false, but continuing...`);
+      return false;
+    }
     console.log(`[SERVER] ${name} service initialized successfully`);
     return true;
   } catch (error) {
@@ -38,7 +42,7 @@ async function initialize() {
   }
 
   const serviceStatus = {
-    storage: false,
+    storage: true, // Storage is already initialized above
     sheets: false,
     hugo: false,
     analyzer: false,
@@ -48,20 +52,14 @@ async function initialize() {
     perplexity: false
   };
 
-  try {
-    [serviceStatus.storage, serviceStatus.sheets, serviceStatus.hugo, serviceStatus.analyzer, serviceStatus.keyword, serviceStatus.paa, serviceStatus.serp, serviceStatus.perplexity] = await Promise.all([
-      initializeService(contentStorage, 'Storage'),
-      initializeService(sheetsService, 'Sheets'),
-      initializeService(hugoService, 'Hugo'),
-      initializeService(contentAnalyzerService, 'Content Analyzer'),
-      initializeService(keywordResearchService, 'Keyword Research'),
-      initializeService(paaService, 'People Also Ask'),
-      initializeService(serpService, 'SERP'),
-      initializeService(perplexityService, 'Perplexity')
-    ]);
-  } catch (error) {
-    console.error('[SERVER] Error initializing services:', error);
-  }
+  // Initialize services individually to ensure one failure doesn't prevent others
+  serviceStatus.sheets = await initializeService(sheetsService, 'Sheets');
+  serviceStatus.hugo = await initializeService(hugoService, 'Hugo');
+  serviceStatus.analyzer = await initializeService(contentAnalyzerService, 'Content Analyzer');
+  serviceStatus.keyword = await initializeService(keywordResearchService, 'Keyword Research');
+  serviceStatus.paa = await initializeService(paaService, 'People Also Ask');
+  serviceStatus.serp = await initializeService(serpService, 'SERP');
+  serviceStatus.perplexity = await initializeService(perplexityService, 'Perplexity');
 
   // Set up routes
   app.post('/api/hugo/process', async (req, res) => {

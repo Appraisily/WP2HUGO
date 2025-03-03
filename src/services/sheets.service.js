@@ -12,8 +12,22 @@ class SheetsService {
 
   async initialize() {
     try {
-      const credentials = JSON.parse(await getSecret(secretNames.serviceAccountJson));
-      this.sheetsId = await getSecret(secretNames.sheetsId);
+      let credentials;
+      try {
+        credentials = JSON.parse(await getSecret(secretNames.serviceAccountJson));
+      } catch (error) {
+        console.warn('[SHEETS] Service account credentials not available:', error.message);
+        console.warn('[SHEETS] Sheets integration will be disabled');
+        return false;
+      }
+
+      try {
+        this.sheetsId = await getSecret(secretNames.sheetsId);
+      } catch (error) {
+        console.warn('[SHEETS] Sheets ID not available:', error.message);
+        console.warn('[SHEETS] Sheets integration will be disabled');
+        return false;
+      }
 
       this.auth = new google.auth.GoogleAuth({
         credentials,
@@ -34,10 +48,11 @@ class SheetsService {
 
       this.isConnected = true;
       console.log('[SHEETS] Successfully initialized');
+      return true;
     } catch (error) {
       console.error('[SHEETS] Initialization failed:', error);
       this.isConnected = false;
-      throw error;
+      return false;
     }
   }
 
