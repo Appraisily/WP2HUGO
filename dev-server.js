@@ -1,4 +1,46 @@
+// Development server script for WP2HUGO
+// This script sets up the environment for local development and testing
+const fs = require('fs');
+const path = require('path');
 
+// Set environment variables for development
+process.env.NODE_ENV = 'development';
+process.env.USE_MOCK_DATA = 'true';  // Enable mock data
+process.env.PORT = '3000';  // Use port 3000 instead of 8080
+process.env.PROJECT_ID = 'local-dev-project'; // Mock project ID
+process.env.GOOGLE_CLOUD_PROJECT = 'local-dev-project'; // Mock GCP project
+
+// Create output directories if they don't exist
+const outputDir = path.join(__dirname, 'output');
+const researchDir = path.join(outputDir, 'research');
+const contentDir = path.join(outputDir, 'content');
+const imagesDir = path.join(outputDir, 'images');
+
+const createDirIfNotExists = (dir) => {
+  if (!fs.existsSync(dir)) {
+    console.log(`Creating directory: ${dir}`);
+    fs.mkdirSync(dir, { recursive: true });
+  }
+};
+
+createDirIfNotExists(outputDir);
+createDirIfNotExists(researchDir);
+createDirIfNotExists(contentDir);
+createDirIfNotExists(imagesDir);
+
+// Mock the storage implementation
+const mockStorage = () => {
+  const contentStoragePath = path.resolve(__dirname, 'src/utils/storage.js');
+  
+  // Check if original file exists
+  if (!fs.existsSync(`${contentStoragePath}.original`)) {
+    // Backup the original file
+    fs.copyFileSync(contentStoragePath, `${contentStoragePath}.original`);
+    console.log(`Backed up original storage implementation to ${contentStoragePath}.original`);
+  }
+  
+  // Create mock implementation
+  const mockImplementation = `
 // MOCK STORAGE IMPLEMENTATION FOR LOCAL DEVELOPMENT
 const fs = require('fs');
 const path = require('path');
@@ -92,7 +134,7 @@ class ContentStorage {
       
       // Check if file exists
       if (!fs.existsSync(fullPath)) {
-        throw new Error(`File not found: ${filePath}`);
+        throw new Error(\`File not found: \${filePath}\`);
       }
 
       // Read content
@@ -144,4 +186,43 @@ class ContentStorage {
 }
 
 module.exports = new ContentStorage();
+  `;
   
+  // Write the mock implementation
+  fs.writeFileSync(contentStoragePath, mockImplementation);
+  console.log('Replaced storage implementation with mock version for local development');
+};
+
+// Create a script to restore the original storage implementation
+const createRestoreScript = () => {
+  const restoreScript = `
+// Script to restore original storage implementation
+const fs = require('fs');
+const path = require('path');
+
+const contentStoragePath = path.resolve(__dirname, 'src/utils/storage.js');
+const originalPath = \`\${contentStoragePath}.original\`;
+
+if (fs.existsSync(originalPath)) {
+  fs.copyFileSync(originalPath, contentStoragePath);
+  console.log('Restored original storage implementation');
+} else {
+  console.error('Original storage implementation backup not found');
+}
+  `;
+  
+  fs.writeFileSync('restore-storage.js', restoreScript);
+  console.log('Created restore-storage.js script to restore original implementation');
+};
+
+// Apply mock storage implementation and create restore script
+mockStorage();
+createRestoreScript();
+
+// Log the development mode
+console.log('Starting WP2HUGO in DEVELOPMENT mode');
+console.log('Mock data is ENABLED');
+console.log('Local storage implementation is ACTIVE');
+
+// Start the server
+require('./src/server.js'); 
