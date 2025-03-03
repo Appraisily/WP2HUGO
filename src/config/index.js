@@ -5,6 +5,9 @@ const ROOT_PATH = path.resolve(__dirname, '../..');
 const OUTPUT_PATH = path.join(ROOT_PATH, 'output');
 
 const config = {
+  // Server configuration
+  port: process.env.PORT || 8080,
+  
   // Paths
   paths: {
     root: ROOT_PATH,
@@ -15,6 +18,17 @@ const config = {
     markdown: path.join(OUTPUT_PATH, 'markdown'),
     hugoContent: path.join(ROOT_PATH, 'content'),
     keywords: path.join(ROOT_PATH, 'keywords.txt'),
+  },
+  
+  // Secret names for Google Cloud Secret Manager
+  secretNames: {
+    serviceAccountJson: 'SERVICE_ACCOUNT_JSON',
+    sheetsId: 'SHEETS_ID',
+    openaiApiKey: 'OPENAI_API_KEY',
+    anthropicApiKey: 'ANTHROPIC_API_KEY',
+    googleAiApiKey: 'GOOGLE_AI_API_KEY',
+    perplexityApiKey: 'PERPLEXITY_API_KEY',
+    kwrdsApiKey: 'KWRDS_API_KEY'
   },
   
   // API configurations

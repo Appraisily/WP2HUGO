@@ -14,7 +14,8 @@
  *   --skip-intent    Skip search intent analysis step
  *   --intent-only    Run only the search intent analysis step
  *   --min-score=N    Set minimum SEO score threshold (default: 85)
- *   --image-count=N  Number of images to generate (default: 5)
+ *   --image-count=N  Number of images to generate (default: smart)
+ *   --auto-image     Automatically determine optimal image count (default: true)
  */
 
 require('dotenv').config();
@@ -32,7 +33,8 @@ let skipImage = false;
 let skipIntent = false;
 let intentOnly = false;
 let minScore = 85;
-let imageCount = 5;
+let imageCount = 0; // 0 means auto-determine
+let autoImage = true;
 
 // Display help if requested
 if (args.includes('--help') || args.includes('-h')) {
@@ -47,7 +49,8 @@ Options:
   --skip-intent     Skip search intent analysis step
   --intent-only     Run only the search intent analysis step
   --min-score=N     Set minimum SEO score threshold (default: 85)
-  --image-count=N   Number of images to generate (default: 5)
+  --image-count=N   Number of images to generate (default: smart)
+  --no-auto-image   Disable automatic image count determination (use default 5)
   --help, -h        Display this help message
 `);
   process.exit(0);
@@ -63,6 +66,9 @@ for (const arg of args) {
     skipIntent = true;
   } else if (arg === '--intent-only') {
     intentOnly = true;
+  } else if (arg === '--no-auto-image') {
+    autoImage = false;
+    imageCount = 5; // Default to 5 if auto is disabled
   } else if (arg.startsWith('--min-score=')) {
     const scoreStr = arg.split('=')[1];
     const score = parseInt(scoreStr, 10);
@@ -76,8 +82,9 @@ for (const arg of args) {
     const count = parseInt(countStr, 10);
     if (!isNaN(count) && count > 0) {
       imageCount = Math.min(count, 10); // Cap at 10 images
+      autoImage = false; // Manual count overrides auto
     } else {
-      console.warn(`[WARNING] Invalid image-count value: ${countStr}. Using default: 5`);
+      console.warn(`[WARNING] Invalid image-count value: ${countStr}. Using smart determination`);
     }
   } else if (!arg.startsWith('--')) {
     keyword = arg;
@@ -185,11 +192,32 @@ async function generateSystematicContent(keyword, options) {
       throw new Error(`Required optimized content file not found: ${optimizedFile}`);
     }
     
+    // If auto image count is enabled, load the recommended count from optimization results
+    if (options.autoImage && options.imageCount === 0 && !options.skipImage) {
+      try {
+        // Check if optimized file contains image recommendation
+        const optimizedData = JSON.parse(fs.readFileSync(optimizedFile, 'utf8'));
+        if (optimizedData.imageRecommendation && optimizedData.imageRecommendation.recommendedImageCount) {
+          options.imageCount = optimizedData.imageRecommendation.recommendedImageCount;
+          console.log(`\n[INFO] Using AI-recommended image count: ${options.imageCount}`);
+          console.log(`[INFO] Reasoning: ${optimizedData.imageRecommendation.reasoning || 'Not provided'}`);
+        } else {
+          // Default to 5 if no recommendation is found
+          options.imageCount = 5;
+          console.log(`\n[INFO] No image count recommendation found, using default: ${options.imageCount}`);
+        }
+      } catch (error) {
+        console.warn(`[WARNING] Failed to read image count recommendation: ${error.message}`);
+        options.imageCount = 5;
+        console.log(`\n[INFO] Using default image count: ${options.imageCount}`);
+      }
+    }
+    
     global.gc && global.gc(); // Trigger garbage collection if available
     
     // STEP 5: Generate images
     if (!options.skipImage) {
-      console.log(`\n[STEP 5] Generating images for "${keyword}"...`);
+      console.log(`\n[STEP 5] Generating ${options.imageCount} images for "${keyword}"...`);
       const imageSuccess = executeStep(
         `node --max-old-space-size=4096 generate-image.js "${keyword}" ${options.forceApi ? '--force-api' : ''} --image-count=${options.imageCount}`,
         `Image generation for "${keyword}"`
@@ -248,21 +276,20 @@ async function generateSystematicContent(keyword, options) {
     const endTime = performance.now();
     const duration = ((endTime - startTime) / 60000).toFixed(2); // Convert to minutes
     
-    console.log(`Process terminated after ${duration} minutes`);
+    console.error(`Process failed after ${duration} minutes`);
     return false;
   }
 }
 
 /**
- * Execute a step in the content generation process
- * 
- * @param {string} command - Command to execute
- * @param {string} description - Description of the step
- * @returns {boolean} - True if successful, false otherwise
+ * Execute a command and return whether it succeeded
+ * @param {string} command - The command to execute
+ * @param {string} description - Description of the command for logging
+ * @returns {boolean} - Whether the command succeeded
  */
 function executeStep(command, description) {
+  console.log(`[EXEC] ${description}`);
   try {
-    console.log(`Executing: ${command}`);
     execSync(command, { stdio: 'inherit' });
     console.log(`[SUCCESS] ${description} completed successfully`);
     return true;
@@ -274,9 +301,8 @@ function executeStep(command, description) {
 
 /**
  * Check if a file exists
- * 
  * @param {string} filePath - Path to the file
- * @returns {boolean} - True if file exists, false otherwise
+ * @returns {boolean} - Whether the file exists
  */
 function fileExists(filePath) {
   try {
@@ -287,22 +313,40 @@ function fileExists(filePath) {
 }
 
 /**
- * Convert a keyword to a slug for filenames
- * 
- * @param {string} keyword - The keyword to convert
+ * Get a slug from a keyword
+ * @param {string} keyword - The keyword to slugify
  * @returns {string} - The slugified keyword
  */
 function getSlug(keyword) {
   return keyword
     .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
-// Run the content generation process if this script is executed directly
+// If this script is executed directly, run the main function
 if (require.main === module) {
-  generateSystematicContent(keyword, { forceApi, skipImage, minScore, imageCount })
+  // Create options object
+  const options = {
+    forceApi,
+    skipImage,
+    skipIntent,
+    intentOnly,
+    minScore,
+    imageCount,
+    autoImage
+  };
+  
+  // Check if keyword was provided
+  if (!keyword) {
+    console.error('[ERROR] No keyword provided');
+    console.log('Please provide a keyword as the first argument');
+    console.log('Example: node systematic-content-generator.js "content marketing"');
+    process.exit(1);
+  }
+  
+  // Run the main function
+  generateSystematicContent(keyword, options)
     .then(success => {
       process.exit(success ? 0 : 1);
     })

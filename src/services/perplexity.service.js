@@ -13,6 +13,31 @@ class PerplexityService {
   constructor() {
     this.forceApi = false;
     this.mockDelay = 1800; // Simulate API delay in ms
+    this.isInitialized = false;
+  }
+
+  /**
+   * Initialize the Perplexity service
+   * @returns {Promise<void>}
+   */
+  async initialize() {
+    try {
+      if (process.env.PERPLEXITY_API_KEY) {
+        console.log('[PERPLEXITY] API key found, service initialized with API access');
+      } else {
+        console.warn('[PERPLEXITY] API key not found. Using mock data for testing.');
+      }
+      
+      // Ensure output directory exists
+      const outputDir = path.join(process.cwd(), 'output', 'research');
+      await fs.mkdir(outputDir, { recursive: true });
+      
+      this.isInitialized = true;
+      return true;
+    } catch (error) {
+      console.error(`[PERPLEXITY] Initialization failed: ${error.message}`);
+      throw error;
+    }
   }
 
   /**
@@ -30,6 +55,10 @@ class PerplexityService {
    * @returns {Promise<object>} - The query response
    */
   async query(keyword) {
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
+    
     console.log(`[PERPLEXITY] Querying for information about: "${keyword}"`);
     
     try {

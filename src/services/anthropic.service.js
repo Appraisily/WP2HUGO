@@ -25,6 +25,159 @@ class AnthropicService {
   }
 
   /**
+   * Analyze content and recommend the optimal number of images
+   * @param {string} keyword - The keyword for the content
+   * @param {object} content - The content to analyze
+   * @returns {Promise<object>} - Analysis results with recommended image count
+   */
+  async analyzeContentForImages(keyword, content) {
+    console.log(`[ANTHROPIC] Analyzing content for image recommendations: "${keyword}"`);
+    
+    try {
+      const slug = slugify(keyword);
+      const cachePath = path.join(process.cwd(), 'output', 'research', `${slug}-image-analysis.json`);
+      
+      // Check if cache exists and we're not forcing API usage
+      try {
+        if (!this.forceApi) {
+          const cacheExists = await fs.access(cachePath).then(() => true).catch(() => false);
+          if (cacheExists) {
+            console.log(`[ANTHROPIC] Using cached image analysis for "${keyword}"`);
+            const cachedData = await fs.readFile(cachePath, 'utf8');
+            return JSON.parse(cachedData);
+          }
+        }
+      } catch (error) {
+        // Cache doesn't exist or is invalid, proceed with analysis
+      }
+      
+      // Check if we have API access
+      if (!process.env.ANTHROPIC_API_KEY) {
+        console.warn('[ANTHROPIC] API key not found, using mock implementation');
+        return this.generateMockImageAnalysis(keyword, content);
+      }
+      
+      // TODO: Implement real API call to Anthropic
+      console.warn('[ANTHROPIC] Real API implementation not available, using mock');
+      const analysis = await this.generateMockImageAnalysis(keyword, content);
+      
+      // Save analysis to cache
+      try {
+        await fs.mkdir(path.dirname(cachePath), { recursive: true });
+        await fs.writeFile(cachePath, JSON.stringify(analysis, null, 2));
+      } catch (error) {
+        console.warn(`[ANTHROPIC] Failed to cache image analysis: ${error.message}`);
+      }
+      
+      return analysis;
+    } catch (error) {
+      console.error(`[ANTHROPIC] Error analyzing content for images: ${error.message}`);
+      // Return a default recommendation in case of error
+      return {
+        recommendedImageCount: 3,
+        reasoning: "Error during analysis, using default recommendation",
+        defaultUsed: true
+      };
+    }
+  }
+
+  /**
+   * Generate mock image analysis for testing
+   * @param {string} keyword - The keyword for the content
+   * @param {object} content - The content to analyze
+   * @returns {Promise<object>} - Mock analysis results
+   */
+  async generateMockImageAnalysis(keyword, content) {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, this.mockDelay));
+    
+    // Analyze content complexity and structure to determine image needs
+    let recommendedCount = 3; // Default recommendation
+    let reasoning = "";
+    
+    // Count sections to determine content length and complexity
+    let sectionCount = 0;
+    let hasTechnicalContent = false;
+    let hasHowToContent = false;
+    let hasListContent = false;
+    let complexityLevel = "medium";
+    
+    // Analyze content structure if available
+    if (content.content && Array.isArray(content.content)) {
+      // Count sections 
+      sectionCount = content.content.filter(item => item.type === 'section').length;
+      
+      // Check content type and complexity
+      content.content.forEach(section => {
+        if (section.type === 'section') {
+          const headingLower = section.heading.toLowerCase();
+          
+          // Check for how-to content 
+          if (headingLower.includes('how to') || headingLower.includes('guide') || headingLower.includes('steps')) {
+            hasHowToContent = true;
+          }
+          
+          // Check for list content
+          if (headingLower.includes('tips') || headingLower.includes('list') || 
+              headingLower.includes('ways') || headingLower.includes('examples')) {
+            hasListContent = true;
+          }
+          
+          // Check for technical content
+          if (headingLower.includes('technical') || headingLower.includes('advanced') || 
+              headingLower.includes('analysis') || headingLower.includes('comparison')) {
+            hasTechnicalContent = true;
+          }
+        }
+      });
+      
+      // Determine complexity level
+      if (sectionCount > 7 || hasTechnicalContent) {
+        complexityLevel = "high";
+      } else if (sectionCount < 4 && !hasTechnicalContent) {
+        complexityLevel = "low";
+      }
+    }
+    
+    // Determine recommended image count based on analysis
+    if (complexityLevel === "high") {
+      recommendedCount = Math.min(5, sectionCount);
+      reasoning = `Content is complex with ${sectionCount} sections. Multiple images will help break up text and illustrate complex concepts.`;
+    } else if (hasHowToContent) {
+      recommendedCount = Math.min(5, sectionCount);
+      reasoning = `How-to content benefits from step-by-step illustrations. Recommended ${recommendedCount} images to visualize the process.`;
+    } else if (hasListContent) {
+      recommendedCount = Math.min(4, sectionCount);
+      reasoning = `List-based content works well with supporting visuals. Recommended ${recommendedCount} images to enhance engagement.`;
+    } else if (complexityLevel === "low") {
+      recommendedCount = 1;
+      reasoning = `Content is relatively short and straightforward. A single feature image should be sufficient.`;
+    } else {
+      recommendedCount = 3;
+      reasoning = `Standard informational content. Recommended ${recommendedCount} images to maintain reader engagement.`;
+    }
+    
+    // Create analysis result
+    const analysisResult = {
+      keyword,
+      recommendedImageCount: recommendedCount,
+      reasoning,
+      contentAnalysis: {
+        sectionCount,
+        complexityLevel,
+        contentTypes: {
+          hasTechnicalContent,
+          hasHowToContent,
+          hasListContent
+        }
+      },
+      timestamp: new Date().toISOString()
+    };
+    
+    return analysisResult;
+  }
+
+  /**
    * Enhance content with detailed, high-quality writing
    * @param {string} keyword - The keyword to enhance content for
    * @param {object} structureData - Content structure data

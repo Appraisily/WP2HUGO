@@ -41,6 +41,52 @@ anthropicService.setForceApi(forceApi);
 seoQualityService.setForceApi(forceApi);
 
 /**
+ * Determine the optimal number of images based on content analysis
+ * Uses AI to analyze content and decide how many images would be beneficial
+ */
+async function determineOptimalImageCount(keyword, content) {
+  console.log(`[INFO] Analyzing content to determine optimal image count...`);
+  
+  try {
+    // Default image count if analysis fails
+    let recommendedCount = 3;
+    
+    // Use Anthropic to analyze the content and recommend image count
+    const analysis = await anthropicService.analyzeContentForImages(
+      keyword,
+      content
+    );
+    
+    if (analysis && analysis.recommendedImageCount) {
+      recommendedCount = analysis.recommendedImageCount;
+      console.log(`[INFO] AI analysis recommends ${recommendedCount} images for this content`);
+      
+      // Log the reasons for this recommendation
+      if (analysis.reasoning) {
+        console.log(`[INFO] Reasoning: ${analysis.reasoning}`);
+      }
+    } else {
+      console.log(`[INFO] Using default image count: ${recommendedCount}`);
+    }
+    
+    // Ensure the count is within reasonable bounds (1-10)
+    recommendedCount = Math.max(1, Math.min(recommendedCount, 10));
+    
+    return {
+      recommendedImageCount: recommendedCount,
+      analysis: analysis || { reasoning: 'Used default recommendation' }
+    };
+  } catch (error) {
+    console.warn(`[WARNING] Failed to determine optimal image count: ${error.message}`);
+    console.log(`[INFO] Using default image count: 3`);
+    return {
+      recommendedImageCount: 3,
+      analysis: { reasoning: 'Error during analysis, using default' }
+    };
+  }
+}
+
+/**
  * Main function to optimize content for a keyword
  */
 async function optimizeContent(keyword, forceApi = false) {
@@ -69,6 +115,9 @@ async function optimizeContent(keyword, forceApi = false) {
     console.log(`- Content Score: ${seoEvaluation.scores.content}/100`);
     console.log(`- Readability Score: ${seoEvaluation.scores.readability}/100`);
     
+    // Determine optimal image count for this content
+    const imageAnalysis = await determineOptimalImageCount(keyword, enhancedContent);
+    
     // Optimize content with Anthropic based on SEO feedback
     console.log(`[INFO] Optimizing content based on SEO feedback...`);
     const startTime = Date.now();
@@ -78,6 +127,9 @@ async function optimizeContent(keyword, forceApi = false) {
       enhancedContent,
       seoEvaluation
     );
+    
+    // Add image count recommendation to optimized content
+    optimizedContent.imageRecommendation = imageAnalysis;
     
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
@@ -105,4 +157,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { optimizeContent }; 
+module.exports = { optimizeContent, determineOptimalImageCount }; 

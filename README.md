@@ -24,7 +24,59 @@ A comprehensive system for generating high-quality markdown content from keyword
    ANTHROPIC_API_KEY=your_anthropic_api_key
    GOOGLEAI_API_KEY=your_googleai_api_key
    PERPLEXITY_API_KEY=your_perplexity_api_key
+   KWRDS_API_KEY=your_kwrds_api_key  # For keyword research
+   PORT=8080  # Required for server mode and Cloud Run deployments
    ```
+
+## Environment Configuration
+
+### API Keys
+- **OPENAI_API_KEY**: Required for content enhancement and optimization
+- **ANTHROPIC_API_KEY**: Used for content enhancement and SEO optimization
+- **GOOGLEAI_API_KEY**: Used for content structure generation
+- **PERPLEXITY_API_KEY**: Used for comprehensive research
+- **KWRDS_API_KEY**: Used for keyword research and related keyword analysis
+
+### Cloud Run Deployment
+When deploying to Cloud Run, ensure:
+1. The PORT environment variable is set to 8080
+2. All API keys are configured as secrets
+3. The service account has appropriate permissions for Google Cloud Storage
+
+Example Dockerfile configuration:
+```dockerfile
+FROM node:16
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+ENV PORT=8080
+
+CMD [ "node", "server.js" ]
+```
+
+### Secret Management
+For Cloud Run deployments, use Secret Manager to store API keys:
+```bash
+# Create secrets
+gcloud secrets create KWRDS_API_KEY --data-file=/path/to/kwrds_key.txt
+gcloud secrets create OPENAI_API_KEY --data-file=/path/to/openai_key.txt
+
+# Grant access to service account
+gcloud secrets add-iam-policy-binding KWRDS_API_KEY \
+    --member=serviceAccount:YOUR-SERVICE-ACCOUNT \
+    --role=roles/secretmanager.secretAccessor
+```
+
+Then reference them in your service:
+```bash
+gcloud run services update wp2hugo \
+    --set-secrets=KWRDS_API_KEY=KWRDS_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest
+```
 
 ## Usage
 
@@ -62,6 +114,26 @@ Options:
 - `--delay=N`: Delay in seconds between processing keywords (default: 5)
 - `--skip-intent`: Skip search intent analysis step
 - `--intent-only`: Run only the search intent analysis step
+
+## Testing in Production Environment
+
+To test with real API data instead of mock data:
+
+1. Ensure all required API keys are properly configured in your `.env` file:
+   ```
+   OPENAI_API_KEY=your_actual_openai_key
+   ANTHROPIC_API_KEY=your_actual_anthropic_key
+   GOOGLEAI_API_KEY=your_actual_googleai_key
+   PERPLEXITY_API_KEY=your_actual_perplexity_key
+   KWRDS_API_KEY=your_actual_kwrds_key
+   ```
+
+2. Run the content generator with the `--force-api` flag:
+   ```bash
+   node systematic-content-generator.js "your keyword" --force-api
+   ```
+
+3. Check that each component is using real API data by watching for messages that indicate API usage (rather than mock data).
 
 ## Content Generation Process
 
@@ -105,6 +177,11 @@ If you encounter errors:
 3. Check log files for detailed error messages
 4. Try running individual steps manually to isolate issues
 5. Increase memory with `NODE_OPTIONS=--max-old-space-size=8192`
+
+### Cloud Run Deployment Issues
+- **Container fails to start**: Ensure the PORT environment variable is set to 8080
+- **Service account errors**: Verify the service account has appropriate permissions
+- **Secret access errors**: Check if secrets are properly mounted and accessible
 
 ## Advanced Content Optimization
 
