@@ -64,7 +64,17 @@ async function initialize() {
   // Set up routes
   app.post('/api/hugo/process', async (req, res) => {
     try {
-      const result = await hugoProcessor.processWorkflow();
+      // Extract keyword from request body
+      const { keyword } = req.body;
+      if (!keyword) {
+        return res.status(400).json({
+          success: false,
+          error: 'Keyword is required'
+        });
+      }
+      
+      console.log(`[SERVER] Processing Hugo workflow for keyword: ${keyword}`);
+      const result = await hugoProcessor.processWorkflow(keyword);
       res.json(result);
     } catch (error) {
       console.error('[SERVER] Error processing Hugo workflow:', error);
