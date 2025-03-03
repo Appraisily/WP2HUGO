@@ -1,110 +1,47 @@
-const axios = require('axios');
-const { getSecret } = require('../utils/secrets');
-const contentStorage = require('../utils/storage');
 
+// MOCK PAA SERVICE FOR LOCAL DEVELOPMENT
 class PeopleAlsoAskService {
   constructor() {
-    this.apiUrl = 'https://paa.api.kwrds.ai/people-also-ask';
-    this.apiKey = null;
+    this.initialized = false;
   }
 
   async initialize() {
-    try {
-      this.apiKey = await getSecret('KWRDS_API_KEY');
-      console.log('[PAA] Service initialized successfully');
-      return true;
-    } catch (error) {
-      console.error('[PAA] Service initialization failed:', error);
-      throw error;
-    }
+    console.log('[PAA] Initializing mock PAA service');
+    this.initialized = true;
+    return true;
   }
 
   async getQuestions(keyword) {
-    try {
-      console.log('[PAA] Checking cache for keyword:', keyword);
-      const cacheResult = await this.checkCache(keyword);
-      
-      if (cacheResult) {
-        console.log('[PAA] Cache hit for keyword:', keyword);
-        return cacheResult.data;
-      }
-
-      console.log('[PAA] Fetching PAA data for keyword:', keyword);
-      
-      const response = await axios.get(this.apiUrl, {
-        params: {
-          keyword,
-          search_country: 'US',
-          search_language: 'en',
-          'X-API-KEY': this.apiKey
-        }
-      });
-
-      const data = response.data;
-      
-      // Cache the result
-      await this.cacheResult(keyword, data);
-
-      return data;
-    } catch (error) {
-      console.error('[PAA] Error fetching PAA data:', error);
-      throw error;
-    }
-  }
-
-  async checkCache(keyword) {
-    try {
-      const slug = this.createSlug(keyword);
-      const filePath = `research/${slug}/paa-data.json`;
-      
-      const content = await contentStorage.getContent(filePath);
-      
-      if (!content || !content.data || !content.timestamp) {
-        return null;
-      }
-
-      // Check if cache is older than 7 days
-      const cacheAge = new Date() - new Date(content.timestamp);
-      const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-      
-      if (cacheAge > maxAge) {
-        console.log('[PAA] Cache expired for:', keyword);
-        return null;
-      }
-
-      return content;
-    } catch (error) {
-      console.log('[PAA] Cache check error:', error);
-      return null;
-    }
-  }
-
-  async cacheResult(keyword, data) {
-    const slug = this.createSlug(keyword);
-    const filePath = `research/${slug}/paa-data.json`;
+    console.log('[PAA] Getting mock questions for:', keyword);
     
-    const cacheData = {
+    return {
       keyword,
-      data,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        questionCount: data.results?.length || 0
-      }
+      results: [
+        {
+          question: `What is the value of ${keyword}?`,
+          answer: `The value of ${keyword} depends on factors like condition, rarity, and provenance. Prices typically range from $100 to $5,000 for common items, with rare pieces commanding much higher prices.`
+        },
+        {
+          question: `How can I identify authentic ${keyword}?`,
+          answer: `To identify authentic ${keyword}, look for maker's marks, examine materials and craftsmanship, research the design period, and consider getting an appraisal from a reputable antiques dealer.`
+        },
+        {
+          question: `Where can I buy ${keyword}?`,
+          answer: `You can purchase ${keyword} from antique shops, specialty dealers, auction houses, online marketplaces like eBay or Etsy, estate sales, and antique fairs or shows.`
+        },
+        {
+          question: `How do I care for ${keyword}?`,
+          answer: `To care for ${keyword}, keep it away from direct sunlight and extreme temperature changes, clean gently with appropriate methods for the material, handle with clean hands, and store properly to prevent damage.`
+        },
+        {
+          question: `Are ${keyword} a good investment?`,
+          answer: `${keyword} can be a good investment if you focus on quality pieces with historical significance or from renowned makers. The market can fluctuate, so it's best to buy pieces you also enjoy for their aesthetic and historical value.`
+        }
+      ],
+      timestamp: new Date().toISOString()
     };
-
-    await contentStorage.storeContent(
-      filePath,
-      cacheData,
-      { type: 'paa_data', keyword }
-    );
-  }
-
-  createSlug(text) {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
   }
 }
 
 module.exports = new PeopleAlsoAskService();
+  

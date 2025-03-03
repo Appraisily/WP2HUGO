@@ -193,6 +193,144 @@ module.exports = new ContentStorage();
   console.log('Replaced storage implementation with mock version for local development');
 };
 
+// Create a mock PAA service that returns mock data
+const createMockPaaService = () => {
+  const paaServicePath = path.resolve(__dirname, 'src/services/paa.service.js');
+  
+  // Check if original file exists
+  if (!fs.existsSync(`${paaServicePath}.original`) && fs.existsSync(paaServicePath)) {
+    // Backup the original file
+    fs.copyFileSync(paaServicePath, `${paaServicePath}.original`);
+    console.log(`Backed up original PAA service to ${paaServicePath}.original`);
+  }
+  
+  const mockPaaService = `
+// MOCK PAA SERVICE FOR LOCAL DEVELOPMENT
+class PeopleAlsoAskService {
+  constructor() {
+    this.initialized = false;
+  }
+
+  async initialize() {
+    console.log('[PAA] Initializing mock PAA service');
+    this.initialized = true;
+    return true;
+  }
+
+  async getQuestions(keyword) {
+    console.log('[PAA] Getting mock questions for:', keyword);
+    
+    return {
+      keyword,
+      results: [
+        {
+          question: \`What is the value of \${keyword}?\`,
+          answer: \`The value of \${keyword} depends on factors like condition, rarity, and provenance. Prices typically range from $100 to $5,000 for common items, with rare pieces commanding much higher prices.\`
+        },
+        {
+          question: \`How can I identify authentic \${keyword}?\`,
+          answer: \`To identify authentic \${keyword}, look for maker's marks, examine materials and craftsmanship, research the design period, and consider getting an appraisal from a reputable antiques dealer.\`
+        },
+        {
+          question: \`Where can I buy \${keyword}?\`,
+          answer: \`You can purchase \${keyword} from antique shops, specialty dealers, auction houses, online marketplaces like eBay or Etsy, estate sales, and antique fairs or shows.\`
+        },
+        {
+          question: \`How do I care for \${keyword}?\`,
+          answer: \`To care for \${keyword}, keep it away from direct sunlight and extreme temperature changes, clean gently with appropriate methods for the material, handle with clean hands, and store properly to prevent damage.\`
+        },
+        {
+          question: \`Are \${keyword} a good investment?\`,
+          answer: \`\${keyword} can be a good investment if you focus on quality pieces with historical significance or from renowned makers. The market can fluctuate, so it's best to buy pieces you also enjoy for their aesthetic and historical value.\`
+        }
+      ],
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+module.exports = new PeopleAlsoAskService();
+  `;
+
+  fs.writeFileSync(paaServicePath, mockPaaService);
+  console.log('Created mock PAA service for local development');
+};
+
+// Create a mock SERP service that returns mock data
+const createMockSerpService = () => {
+  const serpServicePath = path.resolve(__dirname, 'src/services/serp.service.js');
+  
+  // Check if original file exists
+  if (!fs.existsSync(`${serpServicePath}.original`) && fs.existsSync(serpServicePath)) {
+    // Backup the original file
+    fs.copyFileSync(serpServicePath, `${serpServicePath}.original`);
+    console.log(`Backed up original SERP service to ${serpServicePath}.original`);
+  }
+  
+  const mockSerpService = `
+// MOCK SERP SERVICE FOR LOCAL DEVELOPMENT
+class SerpService {
+  constructor() {
+    this.initialized = false;
+  }
+
+  async initialize() {
+    console.log('[SERP] Initializing mock SERP service');
+    this.initialized = true;
+    return true;
+  }
+
+  async getSearchResults(keyword, volume = 0) {
+    console.log('[SERP] Getting mock search results for:', keyword);
+    
+    return {
+      keyword,
+      volume,
+      serp: [
+        {
+          title: \`Complete Guide to \${keyword}: Value, History, and Market Trends\`,
+          url: \`https://www.example.com/antiques/\${keyword.replace(/\\s+/g, '-').toLowerCase()}\`,
+          snippet: \`Comprehensive information about \${keyword} including value ranges, historical context, and current market trends. Learn what makes these items collectible and valuable.\`
+        },
+        {
+          title: \`How to Identify Authentic \${keyword} - Collector's Guide\`,
+          url: \`https://www.collectorsweekly.com/guides/\${keyword.replace(/\\s+/g, '-').toLowerCase()}\`,
+          snippet: \`Expert tips for identifying authentic \${keyword}. Learn about maker's marks, materials, craftsmanship, and how to spot reproductions and fakes.\`
+        },
+        {
+          title: \`\${keyword} for Sale | Top Rated Dealer | Authentic Pieces\`,
+          url: \`https://www.antiquestore.com/shop/\${keyword.replace(/\\s+/g, '-').toLowerCase()}\`,
+          snippet: \`Browse our selection of authentic \${keyword} with certificate of authenticity. We ship worldwide. Prices ranging from $200-$5000 based on condition and rarity.\`
+        },
+        {
+          title: \`The History of \${keyword} - Museum Collection\`,
+          url: \`https://www.museum.org/collections/\${keyword.replace(/\\s+/g, '-').toLowerCase()}\`,
+          snippet: \`Explore the fascinating history of \${keyword} through our museum's digital collection. View rare examples from the 18th to early 20th century with detailed historical context.\`
+        },
+        {
+          title: \`Recent Auction Results for \${keyword} - Price Guide\`,
+          url: \`https://www.auctionhouse.com/results/\${keyword.replace(/\\s+/g, '-').toLowerCase()}\`,
+          snippet: \`View recent auction results for \${keyword} from major auction houses. Price trends, notable sales, and market analysis updated monthly.\`
+        }
+      ],
+      features: [
+        "knowledge_panel",
+        "related_questions",
+        "images",
+        "shopping_results"
+      ],
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+module.exports = new SerpService();
+  `;
+
+  fs.writeFileSync(serpServicePath, mockSerpService);
+  console.log('Created mock SERP service for local development');
+};
+
 // Create a script to restore the original storage implementation
 const createRestoreScript = () => {
   const restoreScript = `
@@ -209,14 +347,38 @@ if (fs.existsSync(originalPath)) {
 } else {
   console.error('Original storage implementation backup not found');
 }
+
+// Restore PAA service
+const paaServicePath = path.resolve(__dirname, 'src/services/paa.service.js');
+const originalPaaPath = \`\${paaServicePath}.original\`;
+
+if (fs.existsSync(originalPaaPath)) {
+  fs.copyFileSync(originalPaaPath, paaServicePath);
+  console.log('Restored original PAA service');
+} else {
+  console.log('Original PAA service backup not found');
+}
+
+// Restore SERP service
+const serpServicePath = path.resolve(__dirname, 'src/services/serp.service.js');
+const originalSerpPath = \`\${serpServicePath}.original\`;
+
+if (fs.existsSync(originalSerpPath)) {
+  fs.copyFileSync(originalSerpPath, serpServicePath);
+  console.log('Restored original SERP service');
+} else {
+  console.log('Original SERP service backup not found');
+}
   `;
   
-  fs.writeFileSync('restore-storage.js', restoreScript);
-  console.log('Created restore-storage.js script to restore original implementation');
+  fs.writeFileSync('restore-services.js', restoreScript);
+  console.log('Created restore-services.js script to restore original implementations');
 };
 
-// Apply mock storage implementation and create restore script
+// Apply mock implementations and create restore script
 mockStorage();
+createMockPaaService();
+createMockSerpService();
 createRestoreScript();
 
 // Log the development mode

@@ -1,118 +1,59 @@
-const axios = require('axios');
-const { getSecret } = require('../utils/secrets');
-const contentStorage = require('../utils/storage');
 
+// MOCK SERP SERVICE FOR LOCAL DEVELOPMENT
 class SerpService {
   constructor() {
-    this.apiUrl = 'https://keywordresearch.api.kwrds.ai/serp';
-    this.apiKey = null;
+    this.initialized = false;
   }
 
   async initialize() {
-    try {
-      this.apiKey = await getSecret('KWRDS_API_KEY');
-      console.log('[SERP] Service initialized successfully');
-      return true;
-    } catch (error) {
-      console.error('[SERP] Service initialization failed:', error);
-      throw error;
-    }
+    console.log('[SERP] Initializing mock SERP service');
+    this.initialized = true;
+    return true;
   }
 
   async getSearchResults(keyword, volume = 0) {
-    try {
-      // Check cache first
-      console.log('[SERP] Checking cache for keyword:', keyword);
-      const cacheResult = await this.checkCache(keyword);
-      
-      if (cacheResult) {
-        console.log('[SERP] Cache hit for keyword:', keyword);
-        return cacheResult.data;
-      }
-
-      console.log('[SERP] Fetching SERP data for keyword:', keyword);
-
-      const response = await axios({
-        method: 'post',
-        url: this.apiUrl,
-        data: {
-          search_question: keyword,
-          search_country: 'en-US',
-          volume
-        },
-        headers: {
-          'X-API-KEY': this.apiKey,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const data = response.data;
-      
-      // Cache the result
-      await this.cacheResult(keyword, data);
-
-      return data;
-    } catch (error) {
-      console.error('[SERP] Error fetching SERP data:', error);
-      throw error;
-    }
-  }
-
-  async checkCache(keyword) {
-    try {
-      const slug = this.createSlug(keyword);
-      const filePath = `research/${slug}/serp-data.json`;
-      
-      const content = await contentStorage.getContent(filePath);
-      
-      if (!content || !content.data || !content.timestamp) {
-        return null;
-      }
-
-      // Check if cache is older than 7 days
-      const cacheAge = new Date() - new Date(content.timestamp);
-      const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days in milliseconds
-      
-      if (cacheAge > maxAge) {
-        console.log('[SERP] Cache expired for:', keyword);
-        return null;
-      }
-
-      return content;
-    } catch (error) {
-      console.log('[SERP] Cache check error:', error);
-      return null;
-    }
-  }
-
-  async cacheResult(keyword, data) {
-    const slug = this.createSlug(keyword);
-    const filePath = `research/${slug}/serp-data.json`;
+    console.log('[SERP] Getting mock search results for:', keyword);
     
-    const cacheData = {
+    return {
       keyword,
-      data,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        resultCount: data.serp?.length || 0,
-        hasPasf: Boolean(data.pasf?.length),
-        hasPasfTrending: Boolean(data.pasf_trending?.length)
-      }
+      volume,
+      serp: [
+        {
+          title: `Complete Guide to ${keyword}: Value, History, and Market Trends`,
+          url: `https://www.example.com/antiques/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
+          snippet: `Comprehensive information about ${keyword} including value ranges, historical context, and current market trends. Learn what makes these items collectible and valuable.`
+        },
+        {
+          title: `How to Identify Authentic ${keyword} - Collector's Guide`,
+          url: `https://www.collectorsweekly.com/guides/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
+          snippet: `Expert tips for identifying authentic ${keyword}. Learn about maker's marks, materials, craftsmanship, and how to spot reproductions and fakes.`
+        },
+        {
+          title: `${keyword} for Sale | Top Rated Dealer | Authentic Pieces`,
+          url: `https://www.antiquestore.com/shop/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
+          snippet: `Browse our selection of authentic ${keyword} with certificate of authenticity. We ship worldwide. Prices ranging from $200-$5000 based on condition and rarity.`
+        },
+        {
+          title: `The History of ${keyword} - Museum Collection`,
+          url: `https://www.museum.org/collections/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
+          snippet: `Explore the fascinating history of ${keyword} through our museum's digital collection. View rare examples from the 18th to early 20th century with detailed historical context.`
+        },
+        {
+          title: `Recent Auction Results for ${keyword} - Price Guide`,
+          url: `https://www.auctionhouse.com/results/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
+          snippet: `View recent auction results for ${keyword} from major auction houses. Price trends, notable sales, and market analysis updated monthly.`
+        }
+      ],
+      features: [
+        "knowledge_panel",
+        "related_questions",
+        "images",
+        "shopping_results"
+      ],
+      timestamp: new Date().toISOString()
     };
-
-    await contentStorage.storeContent(
-      filePath,
-      cacheData,
-      { type: 'serp_data', keyword }
-    );
-  }
-
-  createSlug(text) {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
   }
 }
 
 module.exports = new SerpService();
+  
