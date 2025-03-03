@@ -11,7 +11,10 @@
  * Options:
  *   --force-api      Force use of real APIs instead of mock clients
  *   --skip-image     Skip image generation step
+ *   --skip-intent    Skip search intent analysis step
+ *   --intent-only    Run only the search intent analysis step
  *   --min-score=N    Set minimum SEO score threshold (default: 85)
+ *   --image-count=N  Number of images to generate (default: 5)
  */
 
 require('dotenv').config();
@@ -23,35 +26,61 @@ const { performance } = require('perf_hooks');
 
 // Parse command-line arguments
 const args = process.argv.slice(2);
+let keyword = '';
+let forceApi = false;
+let skipImage = false;
+let skipIntent = false;
+let intentOnly = false;
+let minScore = 85;
+let imageCount = 5;
 
-if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
+// Display help if requested
+if (args.includes('--help') || args.includes('-h')) {
   console.log(`
 Systematic Content Generator
 
-Usage: node ${path.basename(__filename)} "your keyword" [options]
+Usage: node systematic-content-generator.js "your keyword" [options]
+
 Options:
-  --force-api      Force use of real APIs instead of mock clients
-  --skip-image     Skip image generation step
-  --min-score=N    Set minimum SEO score threshold (default: 85)
-  --help, -h       Show this help message
-  `);
+  --force-api       Force use of real APIs instead of mock clients
+  --skip-image      Skip image generation step
+  --skip-intent     Skip search intent analysis step
+  --intent-only     Run only the search intent analysis step
+  --min-score=N     Set minimum SEO score threshold (default: 85)
+  --image-count=N   Number of images to generate (default: 5)
+  --help, -h        Display this help message
+`);
   process.exit(0);
 }
 
-// Extract the keyword and options
-const keyword = args[0];
-const forceApi = args.includes('--force-api');
-const skipImage = args.includes('--skip-image');
-let minScore = 85;
-
-// Parse min-score option if provided
-const minScoreArg = args.find(arg => arg.startsWith('--min-score='));
-if (minScoreArg) {
-  const scoreValue = parseInt(minScoreArg.split('=')[1], 10);
-  if (!isNaN(scoreValue) && scoreValue > 0 && scoreValue <= 100) {
-    minScore = scoreValue;
-  } else {
-    console.warn('[WARNING] Invalid min-score value. Using default: 85');
+// Extract options
+for (const arg of args) {
+  if (arg === '--force-api') {
+    forceApi = true;
+  } else if (arg === '--skip-image') {
+    skipImage = true;
+  } else if (arg === '--skip-intent') {
+    skipIntent = true;
+  } else if (arg === '--intent-only') {
+    intentOnly = true;
+  } else if (arg.startsWith('--min-score=')) {
+    const scoreStr = arg.split('=')[1];
+    const score = parseInt(scoreStr, 10);
+    if (!isNaN(score) && score > 0 && score <= 100) {
+      minScore = score;
+    } else {
+      console.warn(`[WARNING] Invalid min-score value: ${scoreStr}. Using default: 85`);
+    }
+  } else if (arg.startsWith('--image-count=')) {
+    const countStr = arg.split('=')[1];
+    const count = parseInt(countStr, 10);
+    if (!isNaN(count) && count > 0) {
+      imageCount = Math.min(count, 10); // Cap at 10 images
+    } else {
+      console.warn(`[WARNING] Invalid image-count value: ${countStr}. Using default: 5`);
+    }
+  } else if (!arg.startsWith('--')) {
+    keyword = arg;
   }
 }
 
@@ -63,6 +92,19 @@ async function generateSystematicContent(keyword, options) {
   const startTime = performance.now();
   
   try {
+    if (intentOnly) {
+      // If intent-only flag is set, only run the search intent analysis
+      console.log('[INFO] Running in intent-only mode');
+      const searchIntentService = require('./src/services/search-intent.service');
+      if (forceApi) searchIntentService.setForceApi(true);
+      
+      const slug = require('./src/utils/slugify')(keyword);
+      await searchIntentService.analyzeIntent(keyword);
+      
+      console.log(`[SUCCESS] Search intent analysis completed for "${keyword}"`);
+      return;
+    }
+    
     // STEP 1: Research - Use the --keyword flag to process a single keyword
     console.log(`\n[STEP 1] Conducting research for "${keyword}"...`);
     const researchSuccess = executeStep(
@@ -71,7 +113,7 @@ async function generateSystematicContent(keyword, options) {
     );
     
     if (!researchSuccess) {
-      throw new Error('Research process failed');
+      throw new Error('Research step failed');
     }
     
     // Check if research files were created
@@ -88,10 +130,10 @@ async function generateSystematicContent(keyword, options) {
     
     global.gc && global.gc(); // Trigger garbage collection if available
     
-    // STEP 2: Generate Content Structure
+    // STEP 2: Generate content structure
     console.log(`\n[STEP 2] Generating content structure for "${keyword}"...`);
     const structureSuccess = executeStep(
-      `node --max-old-space-size=4096 generate-content-structure.js "${keyword}"`,
+      `node --max-old-space-size=4096 generate-content-structure.js "${keyword}" ${options.forceApi ? '--force-api' : ''} ${options.skipIntent ? '--skip-intent' : ''}`,
       `Content structure generation for "${keyword}"`
     );
     
@@ -107,7 +149,7 @@ async function generateSystematicContent(keyword, options) {
     
     global.gc && global.gc(); // Trigger garbage collection if available
     
-    // STEP 3: Enhance Content
+    // STEP 3: Enhance content with Anthropic
     console.log(`\n[STEP 3] Enhancing content for "${keyword}"...`);
     const enhanceSuccess = executeStep(
       `node --max-old-space-size=4096 enhance-content.js "${keyword}"`,
@@ -126,10 +168,10 @@ async function generateSystematicContent(keyword, options) {
     
     global.gc && global.gc(); // Trigger garbage collection if available
     
-    // STEP 4: Optimize Content
+    // STEP 4: Improve content with SEO optimization
     console.log(`\n[STEP 4] Optimizing content for "${keyword}"...`);
     const optimizeSuccess = executeStep(
-      `node --max-old-space-size=4096 improve-content.js --keyword "${keyword}" --min-score=${minScore}`,
+      `node --max-old-space-size=4096 improve-content.js --keyword "${keyword}" --min-score=${options.minScore}`,
       `Content optimization for "${keyword}"`
     );
     
@@ -145,25 +187,22 @@ async function generateSystematicContent(keyword, options) {
     
     global.gc && global.gc(); // Trigger garbage collection if available
     
-    // STEP 5: Generate Image (if not skipped)
-    let imageGenSuccess = true;
+    // STEP 5: Generate images
     if (!options.skipImage) {
-      console.log(`\n[STEP 5] Generating image for "${keyword}"...`);
-      imageGenSuccess = executeStep(
-        `node --max-old-space-size=4096 generate-image.js "${keyword}" ${options.forceApi ? '--force-api' : ''}`,
+      console.log(`\n[STEP 5] Generating images for "${keyword}"...`);
+      const imageSuccess = executeStep(
+        `node --max-old-space-size=4096 generate-image.js "${keyword}" ${options.forceApi ? '--force-api' : ''} --image-count=${options.imageCount}`,
         `Image generation for "${keyword}"`
       );
       
-      if (!imageGenSuccess) {
-        console.warn('[WARNING] Image generation failed, but continuing with process');
+      if (!imageSuccess) {
+        throw new Error('Image generation failed');
       }
-      
-      global.gc && global.gc(); // Trigger garbage collection if available
     } else {
-      console.log(`\n[STEP 5] Image generation skipped as requested`);
+      console.log(`\n[STEP 5] Skipping image generation as requested`);
     }
     
-    // STEP 6: Generate Markdown
+    // STEP 6: Generate markdown
     console.log(`\n[STEP 6] Generating markdown for "${keyword}"...`);
     const markdownSuccess = executeStep(
       `node --max-old-space-size=4096 generate-markdown.js "${keyword}"`,
@@ -184,29 +223,32 @@ async function generateSystematicContent(keyword, options) {
     
     // STEP 7: Export to Hugo
     console.log(`\n[STEP 7] Exporting to Hugo for "${keyword}"...`);
-    const hugoSuccess = executeStep(
+    const exportSuccess = executeStep(
       `node --max-old-space-size=4096 export-hugo.js "${keyword}"`,
       `Hugo export for "${keyword}"`
     );
     
-    if (!hugoSuccess) {
+    if (!exportSuccess) {
       throw new Error('Hugo export failed');
     }
     
     const endTime = performance.now();
-    const duration = ((endTime - startTime) / 1000 / 60).toFixed(2);
+    const duration = ((endTime - startTime) / 60000).toFixed(2); // Convert to minutes
     
     console.log(`\n[SUCCESS] Systematic content generation completed for "${keyword}" in ${duration} minutes`);
-    console.log(`Markdown file available at: ${markdownFile}`);
+    
+    // Print the location of the markdown file
+    const slug = getSlug(keyword);
+    console.log(`\nMarkdown file available at: output/markdown/${slug}.md`);
     
     return true;
   } catch (error) {
-    const endTime = performance.now();
-    const duration = ((endTime - startTime) / 1000 / 60).toFixed(2);
-    
     console.error(`\n[ERROR] Systematic content generation failed for "${keyword}": ${error.message}`);
-    console.error(`Process terminated after ${duration} minutes`);
     
+    const endTime = performance.now();
+    const duration = ((endTime - startTime) / 60000).toFixed(2); // Convert to minutes
+    
+    console.log(`Process terminated after ${duration} minutes`);
     return false;
   }
 }
@@ -260,7 +302,7 @@ function getSlug(keyword) {
 
 // Run the content generation process if this script is executed directly
 if (require.main === module) {
-  generateSystematicContent(keyword, { forceApi, skipImage, minScore })
+  generateSystematicContent(keyword, { forceApi, skipImage, minScore, imageCount })
     .then(success => {
       process.exit(success ? 0 : 1);
     })

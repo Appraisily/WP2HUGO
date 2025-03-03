@@ -29,10 +29,11 @@ class GoogleAiService {
    * @param {string} keyword - The keyword to generate structure for
    * @param {object} researchData - Keyword research data
    * @param {object} perplexityData - Perplexity research data
+   * @param {object} intentData - Intent data
    * @param {string} additionalInfo - Additional information for structure generation
    * @returns {Promise<object>} - The generated structure
    */
-  async generateStructure(keyword, researchData, perplexityData, additionalInfo = '') {
+  async generateStructure(keyword, researchData, perplexityData, intentData = null, additionalInfo = '') {
     console.log(`[GOOGLE-AI] Generating structure for: "${keyword}"`);
     
     try {

@@ -5,6 +5,7 @@
  * 
  * This script generates markdown content from optimized content data.
  * It combines all the data into a formatted markdown file ready for publishing.
+ * It now supports multiple images throughout the content.
  * 
  * Usage: node generate-markdown.js "your keyword" [options]
  * Options:
@@ -66,21 +67,46 @@ async function generateMarkdown(keyword, forceApi = false) {
     const optimizedContent = JSON.parse(await fs.readFile(optimizedPath, 'utf8'));
     
     // Load image data if available
-    const imagePath = path.join(outputDir, 'images', `${slug}-image.json`);
     let imageData = null;
+    let multipleImages = null;
+    
+    // Check for multi-image data first
+    const multiImagePath = path.join(outputDir, 'images', `${slug}-images.json`);
+    const singleImagePath = path.join(outputDir, 'images', `${slug}-image.json`);
     
     try {
-      const imageFileExists = await fs.access(imagePath).then(() => true).catch(() => false);
-      if (imageFileExists) {
-        console.log(`[INFO] Loading image data from: ${imagePath}`);
-        imageData = JSON.parse(await fs.readFile(imagePath, 'utf8'));
+      // Try to load multiple images first
+      const multiImageFileExists = await fs.access(multiImagePath).then(() => true).catch(() => false);
+      if (multiImageFileExists) {
+        console.log(`[INFO] Loading multiple image data from: ${multiImagePath}`);
+        multipleImages = JSON.parse(await fs.readFile(multiImagePath, 'utf8'));
+        
+        // Still set imageData for backward compatibility
+        imageData = {
+          imageUrl: multipleImages.mainImage,
+          timestamp: multipleImages.timestamp
+        };
+      } else {
+        // Fall back to single image if multiple image file doesn't exist
+        const singleImageFileExists = await fs.access(singleImagePath).then(() => true).catch(() => false);
+        if (singleImageFileExists) {
+          console.log(`[INFO] Loading single image data from: ${singleImagePath}`);
+          imageData = JSON.parse(await fs.readFile(singleImagePath, 'utf8'));
+          
+          // Create a compatible structure
+          multipleImages = {
+            mainImage: imageData.imageUrl,
+            images: [{ imageUrl: imageData.imageUrl, aspect: 'main' }],
+            timestamp: imageData.timestamp
+          };
+        }
       }
     } catch (error) {
       console.warn(`[WARNING] Error loading image data: ${error.message}`);
     }
     
     // Generate markdown content
-    const markdown = await generateMarkdownContent(keyword, optimizedContent, imageData);
+    const markdown = await generateMarkdownContent(keyword, optimizedContent, imageData, multipleImages);
     
     // Save to file
     const markdownPath = path.join(markdownDir, `${slug}.md`);
@@ -98,7 +124,7 @@ async function generateMarkdown(keyword, forceApi = false) {
 /**
  * Generate markdown content from data
  */
-async function generateMarkdownContent(keyword, content, imageData) {
+async function generateMarkdownContent(keyword, content, imageData, multipleImages) {
   console.log(`[INFO] Formatting markdown content for "${keyword}"`);
   
   // Generate frontmatter
@@ -108,14 +134,17 @@ async function generateMarkdownContent(keyword, content, imageData) {
   let body = '';
   
   if (content.body) {
-    // Direct body property
-    body = content.body;
+    // Direct body property - need to inject images into the content
+    body = injectImagesIntoContent(content.body, multipleImages);
   } else if (content.content && Array.isArray(content.content)) {
-    // Content array structure
-    body = processContentArray(content.content);
+    // Content array structure - need to inject images at appropriate sections
+    body = processContentArrayWithImages(content.content, multipleImages);
   } else {
-    // Fallback content
+    // Fallback content with image if available
     body = `# ${content.title || content.seoTitle || `Complete Guide to ${keyword}`}\n\n`;
+    if (multipleImages && multipleImages.images && multipleImages.images.length > 0) {
+      body += `![${keyword}](${multipleImages.mainImage})\n\n`;
+    }
     body += `This is a comprehensive guide about ${keyword}. More content will be added soon.`;
   }
   
@@ -124,23 +153,118 @@ async function generateMarkdownContent(keyword, content, imageData) {
     body = `# ${content.title || content.seoTitle || keyword}\n\n${body}`;
   }
   
+  // Add an image gallery at the end if we have multiple images
+  if (multipleImages && multipleImages.images && multipleImages.images.length > 1) {
+    body += `\n\n## Image Gallery\n\n`;
+    body += `Explore our visual guide to ${keyword} with these carefully selected images.\n\n`;
+    
+    // Add the gallery shortcode
+    const imageUrls = multipleImages.images.map(img => img.imageUrl).join(',');
+    body += `{{< image-gallery images="${imageUrls}" alt="${keyword}" >}}\n\n`;
+  }
+  
   // Combine frontmatter and body
   return `${frontmatter}\n${body}`;
 }
 
 /**
- * Process content array into markdown
+ * Inject images into content text at appropriate locations
  */
-function processContentArray(contentArray) {
+function injectImagesIntoContent(contentText, multipleImages) {
+  if (!multipleImages || !multipleImages.images || multipleImages.images.length <= 1) {
+    return contentText; // No additional images to inject
+  }
+  
+  // Skip the main image (index 0) as it's already in the frontmatter
+  const additionalImages = multipleImages.images.slice(1);
+  if (additionalImages.length === 0) {
+    return contentText;
+  }
+  
+  // Split the content by paragraphs
+  const paragraphs = contentText.split('\n\n');
+  
+  // Determine good insertion points - after headings or every ~5-7 paragraphs
+  const insertionPoints = [];
+  
+  // Find all heading positions
+  paragraphs.forEach((para, index) => {
+    if (para.startsWith('#') && index > 1) { // Skip inserting after the title
+      insertionPoints.push(index);
+    }
+  });
+  
+  // If we don't have enough heading positions, add more insertion points
+  if (insertionPoints.length < additionalImages.length) {
+    // Find how many paragraphs to skip between images
+    const parasPerImage = Math.max(5, Math.floor(paragraphs.length / (additionalImages.length + 1)));
+    
+    // Add additional insertion points
+    for (let i = parasPerImage; i < paragraphs.length; i += parasPerImage) {
+      if (!insertionPoints.includes(i)) {
+        insertionPoints.push(i);
+        if (insertionPoints.length >= additionalImages.length) break;
+      }
+    }
+  }
+  
+  // Sort insertion points in ascending order
+  insertionPoints.sort((a, b) => a - b);
+  
+  // Take only as many insertion points as we have images
+  const finalInsertionPoints = insertionPoints.slice(0, additionalImages.length);
+  
+  // Insert images at the determined points
+  finalInsertionPoints.forEach((point, index) => {
+    const image = additionalImages[index];
+    const imageMarkdown = `\n\n![${image.aspect || 'Image'} related to ${multipleImages.keyword}](${image.imageUrl})\n\n`;
+    paragraphs.splice(point + index, 0, imageMarkdown);
+  });
+  
+  // Join paragraphs back together
+  return paragraphs.join('\n\n');
+}
+
+/**
+ * Process content array into markdown with images
+ */
+function processContentArrayWithImages(contentArray, multipleImages) {
   let markdown = '';
+  let imageIndex = 1; // Start with the second image, as the first is in the frontmatter
+  
+  // Get additional images if available
+  const additionalImages = multipleImages && multipleImages.images && multipleImages.images.length > 1 
+    ? multipleImages.images.slice(1) 
+    : [];
+  
+  // Determine where to put images - roughly estimate how many sections we have
+  let sectionCount = contentArray.filter(item => 
+    item.type === 'section' || item.type === 'introduction' || item.type === 'conclusion'
+  ).length;
+  
+  // Calculate interval for image insertion
+  const imageInterval = additionalImages.length > 0 
+    ? Math.max(1, Math.floor(sectionCount / (additionalImages.length + 1)))
+    : 0;
+  
+  let sectionCounter = 0;
   
   for (const item of contentArray) {
     switch (item.type) {
       case 'introduction':
         markdown += `${item.text}\n\n`;
+        
+        // Add an image after the introduction if we have one
+        if (additionalImages.length > 0 && imageIndex < additionalImages.length) {
+          const image = additionalImages[imageIndex - 1];
+          markdown += `![${image.aspect || 'Image'} related to ${multipleImages.keyword}](${image.imageUrl})\n\n`;
+          imageIndex++;
+        }
         break;
         
       case 'section':
+        sectionCounter++;
+        
         // Add section heading
         const headingLevel = '#'.repeat(item.level || 2);
         markdown += `${headingLevel} ${item.heading}\n\n`;
@@ -158,10 +282,24 @@ function processContentArray(contentArray) {
             markdown += `**${faqItem.question}**\n\n${faqItem.answer}\n\n`;
           }
         }
+        
+        // Add an image after this section if it's the right interval
+        if (additionalImages.length > 0 && imageIndex <= additionalImages.length && sectionCounter % imageInterval === 0) {
+          const image = additionalImages[imageIndex - 1];
+          markdown += `![${image.aspect || 'Image'} related to ${multipleImages.keyword}](${image.imageUrl})\n\n`;
+          imageIndex++;
+        }
         break;
         
       case 'conclusion':
         markdown += `## Conclusion\n\n${item.text}\n\n`;
+        
+        // Add final image if we still have one
+        if (additionalImages.length > 0 && imageIndex <= additionalImages.length) {
+          const image = additionalImages[imageIndex - 1];
+          markdown += `![${image.aspect || 'Image'} related to ${multipleImages.keyword}](${image.imageUrl})\n\n`;
+          imageIndex++;
+        }
         break;
         
       default:

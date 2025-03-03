@@ -10,6 +10,8 @@
  * Options:
  *   --force-api      Force use of real APIs instead of mock clients
  *   --skip-image     Skip image generation step
+ *   --skip-intent    Skip search intent analysis step
+ *   --intent-only    Run only the search intent analysis step
  *   --min-score=N    Set minimum SEO score threshold (default: 85)
  *   --delay=N        Delay in seconds between processing keywords (default: 5)
  */
@@ -32,6 +34,8 @@ Usage: node ${path.basename(__filename)} keywords.txt [options]
 Options:
   --force-api      Force use of real APIs instead of mock clients
   --skip-image     Skip image generation step
+  --skip-intent    Skip search intent analysis step
+  --intent-only    Run only the search intent analysis step
   --min-score=N    Set minimum SEO score threshold (default: 85)
   --delay=N        Delay in seconds between processing keywords (default: 5)
   --help, -h       Show this help message
@@ -43,6 +47,8 @@ Options:
 const keywordsFile = args[0];
 const forceApi = args.includes('--force-api');
 const skipImage = args.includes('--skip-image');
+const skipIntent = args.includes('--skip-intent');
+const intentOnly = args.includes('--intent-only');
 let minScore = 85;
 let delaySeconds = 5;
 
@@ -91,7 +97,7 @@ async function processBatch(keywordsFile, options) {
     }
     
     console.log(`[INFO] Found ${keywords.length} keywords to process`);
-    console.log(`Options: force-api=${options.forceApi}, skip-image=${options.skipImage}, min-score=${options.minScore}, delay=${options.delaySeconds}s`);
+    console.log(`Options: force-api=${options.forceApi}, skip-image=${options.skipImage}, skip-intent=${options.skipIntent}, intent-only=${options.intentOnly}, min-score=${options.minScore}, delay=${options.delaySeconds}s`);
     
     // Prepare results object
     const results = {
@@ -99,6 +105,8 @@ async function processBatch(keywordsFile, options) {
       options: {
         forceApi: options.forceApi,
         skipImage: options.skipImage,
+        skipIntent: options.skipIntent,
+        intentOnly: options.intentOnly,
         minScore: options.minScore,
         delaySeconds: options.delaySeconds
       },
@@ -121,6 +129,8 @@ async function processBatch(keywordsFile, options) {
         
         if (options.forceApi) cmd += ' --force-api';
         if (options.skipImage) cmd += ' --skip-image';
+        if (options.skipIntent) cmd += ' --skip-intent';
+        if (options.intentOnly) cmd += ' --intent-only';
         cmd += ` --min-score=${options.minScore}`;
         
         // Execute the command
@@ -197,6 +207,8 @@ if (require.main === module) {
     const success = await processBatch(keywordsFile, {
       forceApi,
       skipImage,
+      skipIntent,
+      intentOnly,
       minScore,
       delaySeconds
     });
