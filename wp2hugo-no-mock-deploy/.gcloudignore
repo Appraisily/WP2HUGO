@@ -1,0 +1,19 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Git related
+.git/
+.gitignore
+
+# Other files
+*.md
+!README.md
+deploy-*
+*.ps1
+*.zip
