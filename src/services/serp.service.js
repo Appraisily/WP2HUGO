@@ -5,14 +5,14 @@ class SerpService {
   constructor() {
     this.initialized = false;
     this.apiKey = null;
-    this.baseUrl = 'https://serp.api.kwrds.ai'; // Updated to correct SERP API endpoint
+    this.baseUrl = 'https://keywordresearch.api.kwrds.ai'; // Correct SERP API endpoint
     this.isDevelopment = process.env.NODE_ENV === 'development';
   }
 
   async initialize() {
     try {
       // Get API key from environment variable
-      this.apiKey = process.env.SERP_API_KEY;
+      this.apiKey = process.env.SERP_API_KEY || process.env.KWRDS_API_KEY; // Also try KWRDS_API_KEY as fallback
       
       if (!this.apiKey) {
         console.warn('[SERP] API key not found.');
@@ -89,17 +89,18 @@ class SerpService {
       if (!this.isDevelopment && this.apiKey) {
         console.log(`[SERP] Calling API for search results about: ${keyword}`);
         
-        const response = await axios.get(
-          `${this.baseUrl}/search`,
+        // Updated to use POST with the correct request body format
+        const response = await axios.post(
+          `${this.baseUrl}/serp`,
           {
-            params: {
-              keyword: keyword,
-              search_country: 'US', 
-              search_language: 'en'
-            },
+            search_question: keyword,
+            search_country: "en-US",
+            volume: volume || 0
+          },
+          {
             headers: {
               'Content-Type': 'application/json',
-              'X-API-KEY': this.apiKey // Updated to use X-API-KEY as per kwrds.ai docs
+              'X-API-KEY': this.apiKey
             }
           }
         );
@@ -111,41 +112,44 @@ class SerpService {
       if (this.isDevelopment) {
         console.log('[SERP] Getting mock search results for:', keyword);
         
+        // Updated mock data structure to match API response
         return {
-          keyword,
-          volume,
+          pasf: [
+            `${keyword} near me`,
+            `best ${keyword}`,
+            `${keyword} history`,
+            `${keyword} types`,
+            `how to find ${keyword}`,
+            `${keyword} value`,
+            `${keyword} prices`,
+            `${keyword} collectors`
+          ],
+          pasf_trending: [
+            `best ${keyword}`,
+            `${keyword} value`
+          ],
           serp: [
             {
               title: `Complete Guide to ${keyword}: Value, History, and Market Trends`,
               url: `https://www.example.com/antiques/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
-              snippet: `Comprehensive information about ${keyword} including value ranges, historical context, and current market trends. Learn what makes these items collectible and valuable.`
+              snippet: `Comprehensive information about ${keyword} including value ranges, historical context, and current market trends. Learn what makes these items collectible and valuable.`,
+              est_monthly_traffic: Math.floor(Math.random() * 100000) + 50000,
+              favicon: "data:image/webp;base64,UklGRs4BAABXRUJQVlA4IMIBAABwCgCdASo4ADgAPjEOjEYiEREJgCADBLSACKT/T/yO4gjFb5n+Of5GQRr+q+bhqLfPE7APaJ9H+wV0nlGkx79FyYOXb9MiloJ+c/glFuMlok5rYLwgqxGTH6EsAAD"
             },
             {
               title: `How to Identify Authentic ${keyword} - Collector's Guide`,
               url: `https://www.collectorsweekly.com/guides/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
-              snippet: `Expert tips for identifying authentic ${keyword}. Learn about maker's marks, materials, craftsmanship, and how to spot reproductions and fakes.`
+              snippet: `Expert tips for identifying authentic ${keyword}. Learn about maker's marks, materials, craftsmanship, and how to spot reproductions and fakes.`,
+              est_monthly_traffic: Math.floor(Math.random() * 50000) + 20000,
+              favicon: "data:image/webp;base64,UklGRs4BAABXRUJQVlA4IMIBAABwCgCdASo4ADgAPjEOjEYiEREJgCADBLSACKT/T/yO4gjFb5n+Of5GQRr+q+bhqLfPE7APaJ9H+wV0nlGkx79FyYOXb9MiloJ+c/glFuMlok5rYLwgqxGTH6EsAAD"
             },
             {
               title: `${keyword} for Sale | Top Rated Dealer | Authentic Pieces`,
               url: `https://www.antiquestore.com/shop/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
-              snippet: `Browse our selection of authentic ${keyword} with certificate of authenticity. We ship worldwide. Prices ranging from $200-$5000 based on condition and rarity.`
-            },
-            {
-              title: `The History of ${keyword} - Museum Collection`,
-              url: `https://www.museum.org/collections/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
-              snippet: `Explore the fascinating history of ${keyword} through our museum's digital collection. View rare examples from the 18th to early 20th century with detailed historical context.`
-            },
-            {
-              title: `Recent Auction Results for ${keyword} - Price Guide`,
-              url: `https://www.auctionhouse.com/results/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
-              snippet: `View recent auction results for ${keyword} from major auction houses. Price trends, notable sales, and market analysis updated monthly.`
+              snippet: `Browse our selection of authentic ${keyword} with certificate of authenticity. We ship worldwide. Prices ranging from $200-$5000 based on condition and rarity.`,
+              est_monthly_traffic: Math.floor(Math.random() * 40000) + 10000,
+              favicon: "data:image/webp;base64,UklGRs4BAABXRUJQVlA4IMIBAABwCgCdASo4ADgAPjEOjEYiEREJgCADBLSACKT/T/yO4gjFb5n+Of5GQRr+q+bhqLfPE7APaJ9H+wV0nlGkx79FyYOXb9MiloJ+c/glFuMlok5rYLwgqxGTH6EsAAD"
             }
-          ],
-          features: [
-            "knowledge_panel",
-            "related_questions",
-            "images",
-            "shopping_results"
           ],
           timestamp: new Date().toISOString()
         };
