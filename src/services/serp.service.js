@@ -5,7 +5,7 @@ class SerpService {
   constructor() {
     this.initialized = false;
     this.apiKey = null;
-    this.baseUrl = 'https://api.example.com/serp'; // Replace with actual SERP API endpoint
+    this.baseUrl = 'https://serp.api.kwrds.ai'; // Updated to correct SERP API endpoint
     this.isDevelopment = process.env.NODE_ENV === 'development';
   }
 
@@ -43,6 +43,37 @@ class SerpService {
     }
   }
 
+  /**
+   * Get search results with retry logic
+   * @param {string} keyword - The keyword to get search results for
+   * @param {number} volume - The search volume
+   * @param {number} maxRetries - Maximum number of retry attempts
+   * @returns {Promise<Object>} - The search results data
+   */
+  async getSearchResultsWithRetry(keyword, volume = 0, maxRetries = 3) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[SERP] Getting search results for: "${keyword}" (Attempt ${attempt}/${maxRetries})`);
+        return await this.getSearchResults(keyword, volume);
+      } catch (error) {
+        lastError = error;
+        console.warn(`[SERP] Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+        
+        if (attempt < maxRetries) {
+          // Wait before next retry (exponential backoff)
+          const delay = 1000 * Math.pow(2, attempt - 1);
+          console.log(`[SERP] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    // If we got here, all retries failed
+    throw lastError;
+  }
+
   async getSearchResults(keyword, volume = 0) {
     if (!this.initialized) {
       await this.initialize();
@@ -58,13 +89,17 @@ class SerpService {
       if (!this.isDevelopment && this.apiKey) {
         console.log(`[SERP] Calling API for search results about: ${keyword}`);
         
-        const response = await axios.post(
+        const response = await axios.get(
           `${this.baseUrl}/search`,
-          { keyword, volume },
           {
+            params: {
+              keyword: keyword,
+              search_country: 'US', 
+              search_language: 'en'
+            },
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${this.apiKey}`
+              'X-API-KEY': this.apiKey // Updated to use X-API-KEY as per kwrds.ai docs
             }
           }
         );
