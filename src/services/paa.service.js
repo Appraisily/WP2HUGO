@@ -5,7 +5,7 @@ class PeopleAlsoAskService {
   constructor() {
     this.initialized = false;
     this.apiKey = null;
-    this.baseUrl = 'https://api.example.com/paa'; // Replace with actual PAA API endpoint
+    this.baseUrl = 'https://paa.api.kwrds.ai'; // Updated to correct PAA API endpoint
     this.isDevelopment = process.env.NODE_ENV === 'development';
   }
 
@@ -43,6 +43,36 @@ class PeopleAlsoAskService {
     }
   }
 
+  /**
+   * Get questions with retry logic
+   * @param {string} keyword - The keyword to get questions for
+   * @param {number} maxRetries - Maximum number of retry attempts
+   * @returns {Promise<Object>} - The questions data
+   */
+  async getQuestionsWithRetry(keyword, maxRetries = 3) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[PAA] Getting questions for: "${keyword}" (Attempt ${attempt}/${maxRetries})`);
+        return await this.getQuestions(keyword);
+      } catch (error) {
+        lastError = error;
+        console.warn(`[PAA] Attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+        
+        if (attempt < maxRetries) {
+          // Wait before next retry (exponential backoff)
+          const delay = 1000 * Math.pow(2, attempt - 1);
+          console.log(`[PAA] Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    // If we got here, all retries failed
+    throw lastError;
+  }
+
   async getQuestions(keyword) {
     if (!this.initialized) {
       await this.initialize();
@@ -58,13 +88,17 @@ class PeopleAlsoAskService {
       if (!this.isDevelopment && this.apiKey) {
         console.log(`[PAA] Calling API for questions about: ${keyword}`);
         
-        const response = await axios.post(
-          `${this.baseUrl}/questions`,
-          { keyword },
+        const response = await axios.get(
+          `${this.baseUrl}/people-also-ask`,
           {
+            params: {
+              keyword: keyword,
+              search_country: 'US',
+              search_language: 'en'
+            },
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${this.apiKey}`
+              'X-API-KEY': this.apiKey  // Updated to use X-API-KEY as per docs
             }
           }
         );
