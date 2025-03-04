@@ -1,139 +1,150 @@
 # WP2HUGO API: No Mock Data Deployment Guide
 
-## Summary of Changes
+## Overview
 
-This deployment removes the mock data fallback in production environments. The key modifications ensure that the WP2HUGO API will:
+This document outlines the deployment process for updating the WP2HUGO API service to ensure that:
 
-1. Use real data in production and properly report errors when external APIs fail
-2. Continue to support development with mock data for local testing
-3. Use the correct API endpoints and authentication methods for the KWRDS API
+1. The service does not fall back to mock data in production environments
+2. Proper error handling and propagation is implemented
+3. All API integrations are properly configured to use the correct endpoints
+
+## Changes Made
+
+We've made several improvements to the WP2HUGO API that ensure the service properly handles errors and doesn't silently fall back to mock data in production:
+
+1. **Updated API Endpoints**: Fixed the endpoints for Keyword Research, PAA, and SERP services to use the correct kwrds.ai API endpoints.
+2. **Improved Error Handling**: Added retry logic with exponential backoff for all external API calls.
+3. **Environment-Aware Behavior**: Explicitly differentiated between development and production behavior.
+4. **More Descriptive Error Messages**: Errors now provide useful information for debugging.
+5. **Secure API Authentication**: Updated headers to use X-API-KEY authentication for all kwrds.ai services.
 
 ## Files Modified
 
-The following files have been modified:
+1. `src/services/keyword-research.service.js`
+   - Updated to use the correct API endpoints
+   - Added retry logic for API calls
+   - Removed mock data fallback in production environments
+   - Improved error handling and propagation
 
-1. **src/services/keyword-research.service.js**
-   - Updated API endpoint to `https://keywordresearch.api.kwrds.ai`
-   - Changed authentication method to use `X-API-KEY` header
-   - Added environment check to prevent mock data usage in production
-   - Updated request payload format for the KWRDS API
+2. `src/services/hugo/data-collector.service.js`
+   - Improved error handling when interacting with the keyword research service
+   - Removed fallback to mock data in case of errors
+   - Added more descriptive logging
 
-2. **src/services/hugo/data-collector.service.js**
-   - Updated error handling to propagate errors from external services
-   - Removed allowance for mock data fallback
-   - Added try-catch blocks for all external service calls
+3. `src/services/paa.service.js`
+   - Updated to use the correct PAA API endpoint (`https://paa.api.kwrds.ai/people-also-ask`)
+   - Fixed the request structure to match the API documentation
+   - Added retry logic for better resilience
+   - Configured to use the X-API-KEY header for authentication
 
-3. **src/services/paa.service.js**
-   - Added environment-aware behavior
-   - Prevents mock data usage in production
-   - Properly initializes with API key or throws error in production
-
-4. **src/services/serp.service.js**
-   - Added environment-aware behavior
-   - Prevents mock data usage in production
-   - Properly initializes with API key or throws error in production
+4. `src/services/serp.service.js`
+   - Updated to use the correct SERP API endpoint (`https://keywordresearch.api.kwrds.ai/serp`)
+   - Changed from GET to POST method as per API documentation
+   - Corrected the request body structure to include search_question, search_country, and volume
+   - Added retry logic for network resilience
+   - Ensured no mock data is used in production
 
 ## Deployment Instructions
 
 ### Prerequisites
 
-1. Ensure you have the Google Cloud SDK installed
-2. Verify you have sufficient permissions to deploy to Cloud Run
-3. Make sure you have the updated code files ready
+1. Valid API keys for kwrds.ai services (KWRDS_API_KEY, PAA_API_KEY, SERP_API_KEY)
+2. Access to Google Cloud Run or similar hosting platform
+3. Node.js environment for local testing
 
 ### Deployment Steps
 
-#### Option 1: Deploy via Google Cloud Console
+1. **Set up API Keys**:
+   - Ensure all required API keys are set in your environment
+   - For Google Cloud Run, update the environment variables in the service configuration
 
-1. Navigate to the [Google Cloud Console](https://console.cloud.google.com/)
-2. Select your project
-3. Go to Cloud Run > Services > wp2hugo
-4. Click "Edit and Deploy New Revision"
-5. Under "Container", select "Build from source"
-6. Connect to your source repository or upload the deployment package
-7. Ensure the following environment variables are set:
-   - `NODE_ENV=production`
-   - `KWRDS_API_KEY=[your-api-key]`
-   - `PAA_API_KEY=[your-api-key]` (if available)
-   - `SERP_API_KEY=[your-api-key]` (if available)
-8. Click "Deploy"
-
-#### Option 2: Deploy via Command Line
-
-1. Clone or update your local repository with the modified files
-2. Navigate to the project directory
-3. Login to Google Cloud:
-   ```
-   gcloud auth login
-   ```
-4. Set the correct project:
-   ```
-   gcloud config set project wp2hugo-856401495068
-   ```
-5. Deploy the updated service:
-   ```
-   gcloud run deploy wp2hugo --source=. --region=us-central1 --platform=managed --set-env-vars=NODE_ENV=production
-   ```
-   **Note**: If you're using a pre-built container rather than building from source:
-   ```
-   gcloud builds submit --tag gcr.io/wp2hugo-856401495068/wp2hugo
-   gcloud run deploy wp2hugo --image gcr.io/wp2hugo-856401495068/wp2hugo --region=us-central1 --platform=managed --set-env-vars=NODE_ENV=production
+   ```bash
+   # Example: Setting environment variables in Google Cloud Run
+   gcloud run services update wp2hugo-api \
+     --set-env-vars="KWRDS_API_KEY=your-api-key,PAA_API_KEY=your-api-key,SERP_API_KEY=your-api-key"
    ```
 
-6. Set or update the required secrets:
+2. **Deploy Updated Code**:
+   - Upload all modified files to your deployment environment
+   - If using Google Cloud Run, you can deploy using:
+
+   ```bash
+   # Navigate to the directory containing the code
+   cd wp2hugo-deploy
+
+   # Deploy to Google Cloud Run
+   gcloud run deploy wp2hugo-api --source .
    ```
-   gcloud run services update wp2hugo --set-secrets=KWRDS_API_KEY=kwrds-api-key:latest
+
+3. **Verify Deployment**:
+   - Test that the service is running correctly
+   - Verify that API calls are successful
+   - Check that errors are properly propagated and no mock data is returned in production
+
+   ```bash
+   # Example: Test the keyword research API endpoint
+   curl -X POST https://your-service-url/api/research \
+     -H "Content-Type: application/json" \
+     -d '{"keyword": "test keyword"}'
    ```
-   Add additional secrets for PAA and SERP services if available.
 
-### Verification
+## Verification Steps
 
-After deployment, verify that the service is working correctly by making a test request:
+After deployment, perform these tests to ensure everything is working as expected:
 
-```bash
-curl -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"keyword":"test keyword"}' \
-  https://wp2hugo-856401495068.us-central1.run.app/api/hugo/process
-```
+1. **Test Successful API Path**:
+   - Submit a request with a valid keyword
+   - Verify that real data is returned from the kwrds.ai APIs
 
-Expected behavior:
-- If the external APIs are available and correctly configured, you should receive real data.
-- If any external API fails, you should receive an error response rather than mock data.
+2. **Test Error Handling**:
+   - Temporarily use an invalid API key
+   - Verify that the service returns an appropriate error message rather than mock data
 
-## Rollback (If Needed)
+3. **Test Network Resilience**:
+   - Monitor the logs during periods of network instability
+   - Verify that the retry logic is working as expected
 
-If you need to roll back to the previous version:
+## Rollback Instructions
 
-```bash
-gcloud run services update wp2hugo --region=us-central1 --to-revision=[previous-revision-name]
-```
+If issues arise after deployment:
 
-Replace `[previous-revision-name]` with the name of the previous working revision.
+1. Revert to the previous version of the service using your deployment platform's rollback feature
+2. For Google Cloud Run:
+
+   ```bash
+   gcloud run services update-traffic wp2hugo-api --to-revisions=REVISION_NAME=100
+   ```
 
 ## API Key Setup
 
-If you need to obtain or update API keys:
+For security and proper operation, follow these best practices for API key management:
 
-1. **KWRDS API Key**:
-   - Sign up or log in at https://kwrds.ai
-   - Navigate to your account settings to obtain the API key
-
-2. **Store as Secret in Google Cloud**:
-   ```bash
-   echo -n "your-api-key" | gcloud secrets create kwrds-api-key --data-file=-
-   gcloud secrets add-iam-policy-binding kwrds-api-key \
-     --member=serviceAccount:wp2hugo-service-account@wp2hugo-856401495068.iam.gserviceaccount.com \
-     --role=roles/secretmanager.secretAccessor
-   ```
+1. Never hardcode API keys in the source code
+2. Always use environment variables for API keys
+3. Rotate API keys periodically
+4. Use different API keys for development and production environments
 
 ## Notes on Mock Data
 
-After this deployment, mock data will only be used in development environments (`NODE_ENV=development`). In production, the service will:
+- Mock data will only be used in development environments (when `NODE_ENV` is set to `development`)
+- In production, any API failure will result in an error being propagated to the client
+- This ensures that users always receive accurate information or an appropriate error message
 
-1. Try to connect to external APIs
-2. Retry on failure with exponential backoff
-3. Return an error if the API calls fail
-4. Never fall back to mock data
+## Monitoring
 
-This ensures that users always receive accurate information about the service status and are not misled by fictional data. 
+After deployment, monitor these aspects of the service:
+
+1. API call success rates
+2. Error rates and types
+3. Response times
+4. API quota usage
+
+## Support
+
+For any issues with the deployment, please contact the development team.
+
+For API-specific issues, you can contact kwrds.ai support at hello@kwrds.ai.
+
+---
+
+*Last Updated: March 4, 2025* 
