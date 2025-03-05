@@ -4,6 +4,7 @@ const config = require('../config');
 const localStorage = require('../utils/local-storage');
 const slugify = require('../utils/slugify');
 const contentStorage = require('../utils/storage');
+const { getSecret } = require('../utils/secrets');
 
 class KeywordResearchService {
   constructor() {
@@ -28,8 +29,15 @@ class KeywordResearchService {
 
   async initialize() {
     try {
-      // Get API key from environment variable
-      this.apiKey = process.env.KWRDS_API_KEY;
+      // Get API key from Secret Manager or environment variable
+      try {
+        this.apiKey = await getSecret(config.secretNames.kwrdsApiKey);
+        console.log('[KEYWORD-RESEARCH] Successfully retrieved KWRDS API key from Secret Manager');
+      } catch (secretError) {
+        console.warn(`[KEYWORD-RESEARCH] Could not retrieve API key from Secret Manager: ${secretError.message}`);
+        // Fallback to direct environment variable
+        this.apiKey = process.env.KWRDS_API_KEY;
+      }
       
       if (!this.apiKey) {
         console.warn('[KEYWORD-RESEARCH] KWRDS API key not found.');

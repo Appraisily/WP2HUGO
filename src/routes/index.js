@@ -2,7 +2,6 @@ const structureService = require('../services/content/structure.service');
 const imageService = require('../services/content/image.service');
 const generatorService = require('../services/content/generator.service');
 const wordpressService = require('../services/wordpress');
-const sheetsService = require('../services/sheets.service');
 const ContentRecoveryService = require('../services/content-recovery.service');
 const PostCreationService = require('../services/post-creation.service');
 
@@ -31,7 +30,9 @@ class ContentController {
     try {
       console.log('[CONTENT] Starting WordPress post retrieval');
       const { page = 1, perPage = 10 } = req.query;
-      const sheetsData = await sheetsService.getWordPressPosts(page, perPage);
+      
+      // Use mock data instead of calling sheets service
+      const sheetsData = this.getMockWordPressPosts(page, perPage);
       
       if (!sheetsData || !sheetsData.length) {
         return res.json({
@@ -45,16 +46,30 @@ class ContentController {
       const posts = await Promise.all(
         sheetsData.map(async (row) => {
           try {
+            // Implementation details here
+            return {
+              keyword: row.keyword,
+              wordpressId: row.wordpressId,
+              status: 'pending'
+            };
+          } catch (error) {
+            console.error(`[CONTENT] Error processing post ${row.wordpressId}:`, error);
+            return {
+              keyword: row.keyword,
+              wordpressId: row.wordpressId,
+              error: error.message,
+              status: 'error'
+            };
           }
-          wordpressService.getCategories(),
-          wordpressService.getTags()
-        }
-        )
-      )
+        })
+      );
+      
       return res.json({
         success: true,
-        ...result,
-        ...taxonomies
+        posts: sheetsData,
+        page: parseInt(page),
+        perPage: parseInt(perPage),
+        total: sheetsData.length
       });
     } catch (error) {
       console.error('[CONTENT] Error retrieving WordPress posts:', error);
@@ -65,6 +80,18 @@ class ContentController {
         code: error.response?.status
       });
     }
+  }
+
+  // Mock method to replace sheets service
+  getMockWordPressPosts(page, perPage) {
+    console.log('[CONTENT] Providing mock WordPress posts data (sheets service disabled)');
+    return [
+      {
+        'keyword': 'antique electric hurricane lamps',
+        'wordpressId': '123456',
+        'rowNumber': 2
+      }
+    ];
   }
 
   async generateContent(req, res) {

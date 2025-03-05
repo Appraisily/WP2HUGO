@@ -1,6 +1,5 @@
 const axios = require('axios');
 const contentStorage = require('../../utils/storage');
-const sheetsService = require('../sheets.service');
 const dataCollector = require('./data-collector.service');
 const contentGenerator = require('./content-generator.service');
 const contentAnalyzer = require('./content-analyzer.service');
@@ -65,19 +64,16 @@ class WorkflowService {
   }
 
   async getRowData() {
-    console.log(`[HUGO] Fetching up to ${this.batchSize} rows from sheets`);
-    const allRows = await sheetsService.getAllRows();
-    
-    if (!allRows || allRows.length === 0) {
-      console.log('[HUGO] No rows found in spreadsheet');
-      return null;
-    }
-
-    // Limit to batchSize rows
-    const rows = allRows.slice(0, this.batchSize);
-    
-    console.log(`[HUGO] Retrieved ${rows.length} rows for processing`);
-    return rows;
+    console.log(`[HUGO] Providing mock data for processing (sheets service disabled)`);
+    // Return mock data directly instead of using sheets service
+    return [
+      {
+        'KWs': 'antique electric hurricane lamps',
+        'SEO TItle': 'Antique Electric Hurricane Lamps: Value, History & Collecting Guide',
+        'Post ID': '',
+        '2025-01-28T10:25:40.252Z': ''
+      }
+    ];
   }
 
   async processRow(row) {

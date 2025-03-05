@@ -1,4 +1,3 @@
-const sheetsService = require('../services/sheets.service');
 const wordpressService = require('../services/wordpress');
 const contentStorage = require('../utils/storage');
 const hugoService = require('../services/hugo.service');
@@ -36,11 +35,11 @@ class WorkerController {
       this.isProcessing = true;
       console.log('[WORKER] Starting workflow processing');
 
-      // Get all rows from the sheet
-      const rows = await sheetsService.getAllRows();
+      // Get all rows from mock data instead of sheets service
+      const rows = this.getMockRows();
       
       if (!rows || rows.length === 0) {
-        console.log('[WORKER] No rows found in spreadsheet');
+        console.log('[WORKER] No rows found in mock data');
         return {
           success: true,
           message: 'No rows to process',
@@ -153,6 +152,19 @@ class WorkerController {
     } finally {
       this.isProcessing = false;
     }
+  }
+
+  // Mock data method to replace sheets service
+  getMockRows() {
+    console.log('[WORKER] Providing mock row data (sheets service disabled)');
+    return [
+      {
+        'KWs': 'antique electric hurricane lamps',
+        'SEO TItle': 'Antique Electric Hurricane Lamps: Value, History & Collecting Guide',
+        'Post ID': '123456',
+        '2025-01-28T10:25:40.252Z': ''
+      }
+    ];
   }
 
   extractFirstImageUrl(content) {

@@ -2,7 +2,6 @@ const structureService = require('../services/content/structure.service');
 const imageService = require('../services/content/image.service');
 const generatorService = require('../services/content/generator.service');
 const wordpressService = require('../services/wordpress');
-const sheetsService = require('../services/sheets.service');
 const ContentRecoveryService = require('../services/content-recovery.service');
 const PostCreationService = require('../services/post-creation.service');
 

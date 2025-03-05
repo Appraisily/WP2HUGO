@@ -1,6 +1,5 @@
 const { port } = require('./config');
 const express = require('express');
-const sheetsService = require('./services/sheets.service');
 const hugoService = require('./services/hugo.service');
 const contentStorage = require('./utils/storage');
 const hugoProcessor = require('./services/hugo-processor.service');
@@ -43,7 +42,6 @@ async function initialize() {
 
   const serviceStatus = {
     storage: true, // Storage is already initialized above
-    sheets: false,
     hugo: false,
     analyzer: false,
     keyword: false,
@@ -53,7 +51,6 @@ async function initialize() {
   };
 
   // Initialize services individually to ensure one failure doesn't prevent others
-  serviceStatus.sheets = await initializeService(sheetsService, 'Sheets');
   serviceStatus.hugo = await initializeService(hugoService, 'Hugo');
   serviceStatus.analyzer = await initializeService(contentAnalyzerService, 'Content Analyzer');
   serviceStatus.keyword = await initializeService(keywordResearchService, 'Keyword Research');
@@ -130,7 +127,6 @@ async function initialize() {
       status: 'ok',
       services: {
         storage: serviceStatus.storage ? 'connected' : 'disconnected',
-        sheets: serviceStatus.sheets ? 'connected' : 'disconnected',
         hugo: serviceStatus.hugo ? 'connected' : 'disconnected',
         analyzer: serviceStatus.analyzer ? 'connected' : 'disconnected',
         keyword: serviceStatus.keyword ? 'connected' : 'disconnected',
