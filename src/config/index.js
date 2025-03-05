@@ -14,6 +14,16 @@ const config = {
     allowedHeaders: ['Content-Type', 'Authorization']
   },
   
+  // Storage configuration
+  storage: {
+    gcs: {
+      bucketName: process.env.HUGO_BUCKET || 'wp2hugo-local-development'
+    },
+    local: {
+      basePath: process.env.LOCAL_STORAGE_PATH || path.join(process.cwd(), 'data')
+    }
+  },
+  
   // Paths
   paths: {
     root: ROOT_PATH,
