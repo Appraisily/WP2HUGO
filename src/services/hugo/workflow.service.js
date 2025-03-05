@@ -1,6 +1,5 @@
 const path = require('path');
 const fs = require('fs-extra');
-const { nanoid } = require('nanoid');
 const moment = require('moment');
 const contentStorage = require('../../utils/storage');
 const config = require('../../config');
@@ -31,6 +30,9 @@ class WorkflowService {
     }
 
     try {
+      // Dynamically import nanoid (ES Module)
+      const { nanoid } = await import('nanoid');
+      
       const { keyword, title, siteUrl, slug } = data;
       
       if (!keyword || !title) {
