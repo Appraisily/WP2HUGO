@@ -2,7 +2,7 @@ const contentStorage = require('../utils/storage');
 const workflowService = require('./hugo/workflow.service');
 const contentGenerator = require('./hugo/content-generator.service');
 const { createSlug } = require('../utils/slug');
-const keywordResearchService = require('./keyword-research.service');
+const { keywordResearchService } = require('./kwrds');
 
 class HugoProcessorService {
   async processWorkflow(keyword) {

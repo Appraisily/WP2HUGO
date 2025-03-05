@@ -1,7 +1,5 @@
 const contentStorage = require('../../utils/storage');
-const keywordResearchService = require('../keyword-research.service');
-const paaService = require('../paa.service');
-const serpService = require('../serp.service');
+const { keywordResearchService, paaService, serpService } = require('../kwrds');
 const perplexityService = require('../perplexity.service');
 const { createSlug } = require('../../utils/slug');
 const fs = require('fs');

@@ -1,11 +1,13 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
 const { port } = require('./config');
 const express = require('express');
 const hugoService = require('./services/hugo.service');
 const contentStorage = require('./utils/storage');
 const hugoProcessor = require('./services/hugo-processor.service');
-const keywordResearchService = require('./services/keyword-research.service');
-const paaService = require('./services/paa.service');
-const serpService = require('./services/serp.service');
+// Import services from the kwrds folder
+const { keywordResearchService, serpService, paaService } = require('./services/kwrds');
 const perplexityService = require('./services/perplexity.service');
 const contentAnalyzerService = require('./services/hugo/content-analyzer.service');
 const workflowService = require('./services/hugo/workflow.service');
