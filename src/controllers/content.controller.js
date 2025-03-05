@@ -4,6 +4,7 @@ const generatorService = require('../services/content/generator.service');
 const wordpressService = require('../services/wordpress');
 const ContentRecoveryService = require('../services/content-recovery.service');
 const PostCreationService = require('../services/post-creation.service');
+const contentStorage = require('../utils/storage');
 
 class ContentController {
   constructor() {
@@ -134,6 +135,75 @@ class ContentController {
         success: false,
         error: error.message,
         details: error.response?.data
+      });
+    }
+  }
+
+  async getContent(req, res) {
+    try {
+      const contentPath = req.params.path;
+      
+      if (!contentPath) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing content path'
+        });
+      }
+      
+      console.log(`[CONTENT] Retrieving content from path: ${contentPath}`);
+      
+      const content = await contentStorage.getContent(contentPath);
+      
+      return res.json({
+        success: true,
+        content: content.data,
+        metadata: content.metadata
+      });
+    } catch (error) {
+      console.error(`[CONTENT] Error retrieving content: ${error.message}`);
+      
+      return res.status(error.message.includes('not found') ? 404 : 500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+
+  async storeContent(req, res) {
+    try {
+      const contentPath = req.params.path;
+      const { content, metadata = {} } = req.body;
+      
+      if (!contentPath) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing content path'
+        });
+      }
+      
+      if (!content) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing content data'
+        });
+      }
+      
+      console.log(`[CONTENT] Storing content at path: ${contentPath}`);
+      
+      const result = await contentStorage.storeContent(contentPath, content, metadata);
+      
+      return res.json({
+        success: true,
+        path: result.path,
+        url: result.url,
+        metadata: result.metadata
+      });
+    } catch (error) {
+      console.error(`[CONTENT] Error storing content: ${error.message}`);
+      
+      return res.status(500).json({
+        success: false,
+        error: error.message
       });
     }
   }

@@ -3,12 +3,11 @@ const { getSecret } = require('../utils/secrets');
 const contentStorage = require('../utils/storage');
 const config = require('../config');
 
-// MOCK SERP SERVICE FOR LOCAL DEVELOPMENT
 class SerpService {
   constructor() {
-    this.apiUrl = 'https://keywordresearch.api.kwrds.ai/serp';
-    this.apiKey = null;
     this.initialized = false;
+    this.apiUrl = 'https://keywordresearch.api.kwrds.ai';
+    this.apiKey = null;
   }
 
   async initialize() {
@@ -16,150 +15,88 @@ class SerpService {
       // Get API key from Secret Manager or environment variable
       try {
         this.apiKey = await getSecret(config.secretNames.kwrdsApiKey);
-        console.log('[SERP] Successfully retrieved KWRDS API key from Secret Manager');
+        console.log('[SERP-SERVICE] Successfully retrieved KWRDS API key from Secret Manager');
       } catch (secretError) {
-        console.warn(`[SERP] Could not retrieve API key from Secret Manager: ${secretError.message}`);
+        console.warn(`[SERP-SERVICE] Could not retrieve API key from Secret Manager: ${secretError.message}`);
         // Fallback to direct environment variable
         this.apiKey = process.env.KWRDS_API_KEY;
       }
-
+      
       if (!this.apiKey) {
-        console.warn('[SERP] KWRDS API key not found. Using mock data instead.');
-        return this.initializeMock();
+        const error = new Error('KWRDS API key not found. SERP service cannot operate without an API key.');
+        error.code = 'MISSING_API_KEY';
+        error.service = 'SERP-SERVICE';
+        throw error;
       }
       
-      console.log('[SERP] Service initialized successfully');
+      console.log('[SERP-SERVICE] API key found. Using real API data.');
       this.initialized = true;
       return true;
     } catch (error) {
-      console.error('[SERP] Service initialization failed:', error);
-      
-      // Fall back to mock implementation if in development
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('[SERP] Development mode: Using mock data due to initialization error.');
-        return this.initializeMock();
-      }
-      
+      console.error('[SERP-SERVICE] Failed to initialize SERP service:', error);
       throw error;
     }
   }
-  
-  async initializeMock() {
-    console.log('[SERP] Initializing mock SERP service');
-    this.useMockData = true;
-    this.initialized = true;
-    return true;
-  }
 
-  async getSearchResults(keyword, volume = 0) {
-    if (this.useMockData) {
-      return this.getMockSearchResults(keyword, volume);
+  async getSearchResults(keyword) {
+    if (!this.initialized) {
+      throw new Error('SERP service not initialized');
     }
-    
+
     try {
-      // Check cache first
-      console.log('[SERP] Checking cache for keyword:', keyword);
-      const cacheResult = await this.checkCache(keyword);
+      console.log(`[SERP-SERVICE] Fetching SERP results for: ${keyword}`);
       
-      if (cacheResult) {
-        console.log('[SERP] Cache hit for keyword:', keyword);
-        return cacheResult.data;
+      // Check if we have cached data first
+      const cacheKey = `research/${keyword.replace(/\s+/g, '-').toLowerCase()}/serp-results.json`;
+      try {
+        const cachedData = await contentStorage.getContent(cacheKey);
+        if (cachedData && cachedData.data) {
+          console.log(`[SERP-SERVICE] Using cached SERP data for: ${keyword}`);
+          return cachedData.data;
+        }
+      } catch (err) {
+        console.log(`[SERP-SERVICE] No cached SERP data found for: ${keyword}`);
       }
-
-      console.log('[SERP] Fetching SERP data for keyword:', keyword);
-
-      const response = await axios({
-        method: 'post',
-        url: this.apiUrl,
-        data: {
-          search_question: keyword,
-          search_country: 'en-US',
-          volume
+      
+      // If no cached data, fetch from API
+      const response = await axios.get(`${this.apiUrl}/serp`, {
+        params: {
+          keyword,
+          country: 'us',
+          language: 'en'
         },
         headers: {
-          'X-API-KEY': this.apiKey,
-          'Content-Type': 'application/json'
-        }
+          'X-API-KEY': this.apiKey
+        },
+        timeout: 30000 // 30 seconds timeout
       });
-
+      
       const data = response.data;
       
       // Cache the result
-      await this.cacheResult(keyword, data);
-
+      await contentStorage.storeContent(
+        cacheKey,
+        data,
+        { 
+          type: 'serp_results', 
+          keyword,
+          timestamp: new Date().toISOString() 
+        }
+      );
+      
       return data;
     } catch (error) {
-      console.error('[SERP] Error fetching SERP data:', error);
-      // If the API call fails, fall back to mock data
-      return this.getMockSearchResults(keyword, volume);
-    }
-  }
-  
-  async checkCache(keyword) {
-    try {
-      const cacheKey = `research/${keyword.replace(/\s+/g, '-').toLowerCase()}/serp-data.json`;
-      return await contentStorage.getContent(cacheKey);
-    } catch (error) {
-      console.log('[SERP] No cache found for keyword:', keyword);
-      return null;
+      console.error(`[SERP-SERVICE] Error fetching SERP data for "${keyword}":`, error);
+      throw this.enhanceError(error, keyword);
     }
   }
 
-  async cacheResult(keyword, data) {
-    try {
-      const cacheKey = `research/${keyword.replace(/\s+/g, '-').toLowerCase()}/serp-data.json`;
-      await contentStorage.storeContent(cacheKey, data, {
-        type: 'serp_data',
-        keyword,
-        timestamp: new Date().toISOString()
-      });
-      console.log('[SERP] Cached result for keyword:', keyword);
-    } catch (error) {
-      console.error('[SERP] Error caching result:', error);
-    }
-  }
-  
-  async getMockSearchResults(keyword, volume = 0) {
-    console.log('[SERP] Getting mock search results for:', keyword);
-    
-    return {
-      keyword,
-      volume,
-      serp: [
-        {
-          title: `Complete Guide to ${keyword}: Value, History, and Market Trends`,
-          url: `https://www.example.com/antiques/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
-          snippet: `Comprehensive information about ${keyword} including value ranges, historical context, and current market trends. Learn what makes these items collectible and valuable.`
-        },
-        {
-          title: `How to Identify Authentic ${keyword} - Collector's Guide`,
-          url: `https://www.collectorsweekly.com/guides/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
-          snippet: `Expert tips for identifying authentic ${keyword}. Learn about maker's marks, materials, craftsmanship, and how to spot reproductions and fakes.`
-        },
-        {
-          title: `${keyword} for Sale | Top Rated Dealer | Authentic Pieces`,
-          url: `https://www.antiquestore.com/shop/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
-          snippet: `Browse our selection of authentic ${keyword} with certificate of authenticity. We ship worldwide. Prices ranging from $200-$5000 based on condition and rarity.`
-        },
-        {
-          title: `The History of ${keyword} - Museum Collection`,
-          url: `https://www.museum.org/collections/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
-          snippet: `Explore the fascinating history of ${keyword} through our museum's digital collection. View rare examples from the 18th to early 20th century with detailed historical context.`
-        },
-        {
-          title: `Recent Auction Results for ${keyword} - Price Guide`,
-          url: `https://www.auctionhouse.com/results/${keyword.replace(/\s+/g, '-').toLowerCase()}`,
-          snippet: `View recent auction results for ${keyword} from major auction houses. Price trends, notable sales, and market analysis updated monthly.`
-        }
-      ],
-      features: [
-        "knowledge_panel",
-        "related_questions",
-        "images",
-        "shopping_results",
-        "top_stories"
-      ]
-    };
+  enhanceError(error, keyword) {
+    const enhancedError = new Error(`Error fetching SERP results for keyword "${keyword}": ${error.message}`);
+    enhancedError.originalError = error;
+    enhancedError.status = error.response?.status;
+    enhancedError.keyword = keyword;
+    return enhancedError;
   }
 }
 

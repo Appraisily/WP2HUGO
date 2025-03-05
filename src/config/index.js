@@ -6,13 +6,20 @@ const OUTPUT_PATH = path.join(ROOT_PATH, 'output');
 
 const config = {
   // Server configuration
-  port: process.env.PORT || 8080,
+  port: process.env.PORT || 3000,
+  environment: process.env.NODE_ENV || 'development',
+  cors: {
+    origin: process.env.CORS_ORIGIN || '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  },
   
   // Paths
   paths: {
     root: ROOT_PATH,
     output: OUTPUT_PATH,
-    research: path.join(OUTPUT_PATH, 'research'),
+    research: process.env.RESEARCH_PATH || './data/research',
+    workflows: process.env.WORKFLOWS_PATH || './data/workflows',
     content: path.join(OUTPUT_PATH, 'content'),
     images: path.join(OUTPUT_PATH, 'images'),
     markdown: path.join(OUTPUT_PATH, 'markdown'),
@@ -22,24 +29,17 @@ const config = {
   
   // Secret names for Google Cloud Secret Manager
   secretNames: {
-    serviceAccountJson: 'service-account-json',
-    sheetsId: 'SHEETS_ID',
-    openaiApiKey: 'OPENAI_API_KEY',
-    anthropicApiKey: 'ANTHROPIC_API_KEY',
-    googleAiApiKey: 'GOOGLE_AI_API_KEY',
     perplexityApiKey: 'PERPLEXITY_API_KEY',
     kwrdsApiKey: 'KWRDS_API_KEY'
   },
   
   // API configurations
-  api: {
-    kwrds: {
-      baseUrl: 'https://app.kwrds.ai/api/v1',
-      timeout: 30000, // 30 seconds
+  apis: {
+    valuer: {
+      baseUrl: process.env.VALUER_API_URL || 'https://valuer-agent-856401495068.us-central1.run.app/api'
     },
     perplexity: {
-      baseUrl: 'https://api.perplexity.ai',
-      timeout: 60000, // 60 seconds
+      baseUrl: 'https://api.perplexity.ai'
     },
     googleAi: {
       baseUrl: 'https://generativelanguage.googleapis.com/v1beta',

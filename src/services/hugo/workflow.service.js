@@ -1,219 +1,353 @@
-const axios = require('axios');
+const path = require('path');
+const fs = require('fs-extra');
+const { nanoid } = require('nanoid');
+const moment = require('moment');
 const contentStorage = require('../../utils/storage');
-const dataCollector = require('./data-collector.service');
-const contentGenerator = require('./content-generator.service');
-const contentAnalyzer = require('./content-analyzer.service');
-const { createSlug } = require('../../utils/slug');
+const config = require('../../config');
+const slugify = require('../../utils/slugify');
 
 class WorkflowService {
   constructor() {
-    this.isProcessing = false;
-    this.batchSize = 20; // Process 20 keywords at once
+    this.initialized = false;
+    this.workflowsPath = config.paths.workflows || path.join(process.cwd(), 'workflows');
   }
 
-  async processWorkflow() {
-    if (this.isProcessing) {
-      console.log('[HUGO] Workflow already in progress');
-      return {
-        success: false,
-        message: 'Workflow already in progress'
-      };
-    }
-
+  async initialize() {
     try {
-      this.isProcessing = true;
-      console.log('[HUGO] Starting workflow processing');
-
-      // Get rows data (up to batchSize)
-      const rows = await this.getRowData();
-      if (!rows || rows.length === 0) {
-        return {
-          success: true,
-          message: 'No rows to process',
-          processed: 0
-        };
-      }
-
-      console.log(`[HUGO] Processing ${rows.length} keywords (max batch size: ${this.batchSize})`);
-
-      // Process multiple rows in parallel
-      const results = await Promise.all(
-        rows.map(row => this.processRow(row))
-      );
-
-      // Store final summary
-      await this.storeSummary(results);
-
-      return {
-        success: true,
-        message: 'Workflow processing completed',
-        summary: {
-          total: results.length,
-          successful: results.filter(r => r.success).length,
-          failed: results.filter(r => !r.success).length
-        },
-        results
-      };
-
+      // Ensure workflows directory exists
+      await fs.ensureDir(this.workflowsPath);
+      this.initialized = true;
+      console.log(`[WORKFLOW] Service initialized with workflows path: ${this.workflowsPath}`);
+      return true;
     } catch (error) {
-      console.error('[HUGO] Critical error in workflow processing:', error);
+      console.error('[WORKFLOW] Failed to initialize workflow service:', error);
       throw error;
-    } finally {
-      this.isProcessing = false;
     }
   }
 
-  async getRowData() {
-    console.log(`[HUGO] Providing mock data for processing (sheets service disabled)`);
-    // Return mock data directly instead of using sheets service
-    return [
-      {
-        'KWs': 'antique electric hurricane lamps',
-        'SEO TItle': 'Antique Electric Hurricane Lamps: Value, History & Collecting Guide',
-        'Post ID': '',
-        '2025-01-28T10:25:40.252Z': ''
-      }
-    ];
-  }
+  async createWorkflow(data) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
 
-  async processRow(row) {
     try {
-      const keyword = row['KWs'];
+      const { keyword, title, siteUrl, slug } = data;
       
-      if (!keyword) {
-        throw new Error('Missing keyword in row');
+      if (!keyword || !title) {
+        throw new Error('Keyword and title are required to create a workflow');
       }
-
-      console.log('[HUGO] Processing keyword:', keyword);
-
-      // Create folder path
-      const slug = createSlug(keyword);
-      const folderPath = `${slug}`;
-
-      // Collect data
-      try {
-        const collectedData = await dataCollector.collectData(keyword, folderPath);
-        
-        // Once data is collected successfully, proceed with the rest of the workflow
-        console.log('[HUGO] Analyzing collected data');
-        const contentAnalysis = await contentAnalyzer.analyzeKeyword(keyword, collectedData);
-        
-        // Variable to store valuation response
-        let valuationResponse = null;
-
-        // Send valuation description to valuation agent if available
-        if (contentAnalysis.valuation_description) {
-          try {
-            console.log('[HUGO] Sending to valuation agent:', contentAnalysis.valuation_description);
-            valuationResponse = await axios.post(
-              'https://valuer-agent-856401495068.us-central1.run.app/api/find-value-range',
-              { text: contentAnalysis.valuation_description },
-              { headers: { 'Content-Type': 'application/json' } }
-            );
-            
-            // Log the value range response
-            console.log('[HUGO] Received valuation range:', {
-              minValue: valuationResponse.data.minValue,
-              maxValue: valuationResponse.data.maxValue,
-              mostLikelyValue: valuationResponse.data.mostLikelyValue
-            });
-            
-            // Store valuation response
-            await contentStorage.storeContent(
-              `${folderPath}/research/valuation-data.json`,
-              {
-                description: contentAnalysis.valuation_description,
-                value_range: {
-                  min: valuationResponse.data.minValue,
-                  max: valuationResponse.data.maxValue,
-                  most_likely: valuationResponse.data.mostLikelyValue
-                },
-                explanation: valuationResponse.data.explanation,
-                auction_results: valuationResponse.data.auctionResults,
-                timestamp: new Date().toISOString()
-              },
-              { type: 'valuation_data', keyword }
-            );
-          } catch (error) {
-            console.error('[HUGO] Error getting valuation:', error);
-            // Continue processing even if valuation fails
-          }
+      
+      // Generate a workflow ID and formatted data
+      const workflowId = nanoid(10);
+      const timestamp = moment().format('YYYY-MM-DD HH:mm:ss');
+      const normalizedSlug = slug || slugify(title);
+      
+      const workflow = {
+        id: workflowId,
+        keyword,
+        title,
+        siteUrl: siteUrl || '',
+        slug: normalizedSlug,
+        status: 'pending',
+        created: timestamp,
+        updated: timestamp,
+        steps: {
+          research: { status: 'pending', startedAt: null, completedAt: null },
+          outline: { status: 'pending', startedAt: null, completedAt: null },
+          draft: { status: 'pending', startedAt: null, completedAt: null },
+          review: { status: 'pending', startedAt: null, completedAt: null },
+          publish: { status: 'pending', startedAt: null, completedAt: null }
         }
-
-        // Prepare final data object
-        const finalData = {
-          ...collectedData,
-          contentAnalysis,
-          valuation: valuationResponse?.data ? {
-            value_range: {
-              min: valuationResponse.data.minValue,
-              max: valuationResponse.data.maxValue,
-              most_likely: valuationResponse.data.mostLikelyValue
-            },
-            explanation: valuationResponse.data.explanation,
-            auction_results: valuationResponse.data.auctionResults
-          } : null,
+      };
+      
+      // Save workflow to local file system and GCS
+      const localFilePath = path.join(this.workflowsPath, `${workflowId}.json`);
+      await fs.writeJson(localFilePath, workflow, { spaces: 2 });
+      
+      // Store in GCS
+      await contentStorage.storeContent(
+        `workflows/${workflowId}.json`,
+        workflow,
+        {
+          contentType: 'application/json',
           metadata: {
             keyword,
-            processedDate: new Date().toISOString(),
-            status: 'data_collected',
-            has_valuation: Boolean(valuationResponse?.data)
+            title,
+            slug: normalizedSlug
           }
-        };
-
-        // Store collected data in regular path
-        await contentStorage.storeContent(
-          `${folderPath}/collected-data.json`,
-          finalData,
-          { type: 'collected_data', keyword }
-        );
-
-        // Store the same data in a dedicated GCS folder with keyword as filename
-        await contentStorage.storeContent(
-          `seo_keywords/${keyword}.json`,
-          finalData,
-          { type: 'keyword_data', keyword }
-        );
-
-        return {
-          success: true,
-          keyword,
-          message: `Successfully processed keyword: ${keyword}`
-        };
-      } catch (error) {
-        // Handle data collection errors specifically
-        console.error(`[HUGO] Error collecting data for keyword "${keyword}": ${error.message}`);
-        return {
-          success: false,
-          keyword,
-          error: `Data collection failed: ${error.message}`,
-          message: `Failed to process keyword: ${keyword}`
-        };
-      }
-
+        }
+      );
+      
+      console.log(`[WORKFLOW] Created new workflow: ${workflowId} for keyword "${keyword}"`);
+      
+      return workflow;
     } catch (error) {
-      console.error('[HUGO] Error processing row:', error);
-      return {
-        success: false,
-        error: error.message,
-        message: `Failed to process row: ${error.message}`
-      };
+      console.error('[WORKFLOW] Error creating workflow:', error);
+      throw error;
     }
   }
 
-  async storeSummary(results) {
-    const summary = {
-      total: results.length,
-      successful: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success).length,
-      timestamp: new Date().toISOString()
-    };
+  async getWorkflow(workflowId) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
 
-    await contentStorage.storeContent(
-      `logs/${new Date().toISOString().split('T')[0]}/workflow-summary.json`,
-      { summary, results },
-      { type: 'workflow_summary' }
-    );
+    try {
+      console.log(`[WORKFLOW] Retrieving workflow: ${workflowId}`);
+      
+      // First try to get it from GCS
+      try {
+        const gcsResult = await contentStorage.getContent(`workflows/${workflowId}.json`);
+        if (gcsResult && gcsResult.data) {
+          console.log(`[WORKFLOW] Retrieved workflow ${workflowId} from GCS`);
+          return gcsResult.data;
+        }
+      } catch (gcsError) {
+        console.log(`[WORKFLOW] Workflow ${workflowId} not found in GCS, trying local file system`);
+      }
+      
+      // Fallback to local file system
+      const localFilePath = path.join(this.workflowsPath, `${workflowId}.json`);
+      if (await fs.pathExists(localFilePath)) {
+        const workflow = await fs.readJson(localFilePath);
+        return workflow;
+      }
+      
+      throw new Error(`Workflow ${workflowId} not found`);
+    } catch (error) {
+      console.error(`[WORKFLOW] Error retrieving workflow ${workflowId}:`, error);
+      throw error;
+    }
+  }
+
+  async updateWorkflow(workflowId, updates) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    try {
+      // Get current workflow
+      const workflow = await this.getWorkflow(workflowId);
+      
+      // Apply updates
+      const updatedWorkflow = {
+        ...workflow,
+        ...updates,
+        updated: moment().format('YYYY-MM-DD HH:mm:ss')
+      };
+      
+      // Save workflow to local file system
+      const localFilePath = path.join(this.workflowsPath, `${workflowId}.json`);
+      await fs.writeJson(localFilePath, updatedWorkflow, { spaces: 2 });
+      
+      // Store in GCS
+      await contentStorage.storeContent(
+        `workflows/${workflowId}.json`,
+        updatedWorkflow,
+        {
+          contentType: 'application/json',
+          metadata: {
+            keyword: updatedWorkflow.keyword,
+            title: updatedWorkflow.title,
+            slug: updatedWorkflow.slug
+          }
+        }
+      );
+      
+      console.log(`[WORKFLOW] Updated workflow: ${workflowId}`);
+      
+      return updatedWorkflow;
+    } catch (error) {
+      console.error(`[WORKFLOW] Error updating workflow ${workflowId}:`, error);
+      throw error;
+    }
+  }
+
+  async updateWorkflowStep(workflowId, step, status, data = null) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    try {
+      // Get current workflow
+      const workflow = await this.getWorkflow(workflowId);
+      
+      // Ensure step exists
+      if (!workflow.steps[step]) {
+        throw new Error(`Step "${step}" does not exist in workflow ${workflowId}`);
+      }
+      
+      // Update step status
+      const timestamp = moment().format('YYYY-MM-DD HH:mm:ss');
+      
+      workflow.steps[step].status = status;
+      
+      if (status === 'in_progress' && !workflow.steps[step].startedAt) {
+        workflow.steps[step].startedAt = timestamp;
+      }
+      
+      if (status === 'completed' && !workflow.steps[step].completedAt) {
+        workflow.steps[step].completedAt = timestamp;
+      }
+      
+      // Add any additional data
+      if (data) {
+        workflow.steps[step].data = data;
+      }
+      
+      // Update overall workflow status based on steps
+      this.updateOverallStatus(workflow);
+      
+      // Save workflow
+      const localFilePath = path.join(this.workflowsPath, `${workflowId}.json`);
+      await fs.writeJson(localFilePath, workflow, { spaces: 2 });
+      
+      // Store in GCS
+      await contentStorage.storeContent(
+        `workflows/${workflowId}.json`,
+        workflow,
+        {
+          contentType: 'application/json',
+          metadata: {
+            keyword: workflow.keyword,
+            title: workflow.title,
+            slug: workflow.slug
+          }
+        }
+      );
+      
+      console.log(`[WORKFLOW] Updated step "${step}" to "${status}" for workflow: ${workflowId}`);
+      
+      return workflow;
+    } catch (error) {
+      console.error(`[WORKFLOW] Error updating step "${step}" for workflow ${workflowId}:`, error);
+      throw error;
+    }
+  }
+
+  updateOverallStatus(workflow) {
+    // Calculate overall status based on step statuses
+    const steps = Object.values(workflow.steps);
+    
+    // If any step is in_progress, workflow is in_progress
+    if (steps.some(step => step.status === 'in_progress')) {
+      workflow.status = 'in_progress';
+      return;
+    }
+    
+    // If all steps are completed, workflow is completed
+    if (steps.every(step => step.status === 'completed')) {
+      workflow.status = 'completed';
+      return;
+    }
+    
+    // If all steps are failed, workflow is failed
+    if (steps.every(step => step.status === 'failed')) {
+      workflow.status = 'failed';
+      return;
+    }
+    
+    // If mix of completed and pending, still in_progress
+    if (steps.some(step => step.status === 'completed') && 
+        steps.some(step => step.status === 'pending')) {
+      workflow.status = 'in_progress';
+      return;
+    }
+    
+    // Default - no change to status
+  }
+
+  async getWorkflows() {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    try {
+      console.log('[WORKFLOW] Retrieving all workflows');
+      
+      // First try to get list from GCS
+      const workflowFiles = [];
+      
+      try {
+        const gcsResult = await contentStorage.listContent('workflows/');
+        if (gcsResult && gcsResult.length > 0) {
+          console.log(`[WORKFLOW] Found ${gcsResult.length} workflows in GCS`);
+          
+          for (const file of gcsResult) {
+            if (file.name.endsWith('.json')) {
+              try {
+                const content = await contentStorage.getContent(file.name);
+                if (content && content.data) {
+                  workflowFiles.push(content.data);
+                }
+              } catch (err) {
+                console.error(`[WORKFLOW] Error retrieving workflow ${file.name} from GCS:`, err);
+              }
+            }
+          }
+        }
+      } catch (gcsError) {
+        console.log('[WORKFLOW] Unable to list workflows from GCS, falling back to local file system');
+      }
+      
+      // If no workflows from GCS, try local file system
+      if (workflowFiles.length === 0) {
+        const files = await fs.readdir(this.workflowsPath);
+        for (const file of files) {
+          if (file.endsWith('.json')) {
+            const filePath = path.join(this.workflowsPath, file);
+            try {
+              const workflow = await fs.readJson(filePath);
+              workflowFiles.push(workflow);
+            } catch (readError) {
+              console.error(`[WORKFLOW] Error reading workflow file ${filePath}:`, readError);
+            }
+          }
+        }
+      }
+      
+      // Sort by updated timestamp (newest first)
+      workflowFiles.sort((a, b) => {
+        const dateA = moment(a.updated, 'YYYY-MM-DD HH:mm:ss');
+        const dateB = moment(b.updated, 'YYYY-MM-DD HH:mm:ss');
+        return dateB.diff(dateA);
+      });
+      
+      return workflowFiles;
+    } catch (error) {
+      console.error('[WORKFLOW] Error retrieving workflows:', error);
+      throw error;
+    }
+  }
+
+  async deleteWorkflow(workflowId) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    try {
+      console.log(`[WORKFLOW] Deleting workflow: ${workflowId}`);
+      
+      // Delete from GCS
+      try {
+        await contentStorage.deleteContent(`workflows/${workflowId}.json`);
+        console.log(`[WORKFLOW] Deleted workflow ${workflowId} from GCS`);
+      } catch (gcsError) {
+        console.error(`[WORKFLOW] Error deleting workflow ${workflowId} from GCS:`, gcsError);
+      }
+      
+      // Delete from local file system
+      const localFilePath = path.join(this.workflowsPath, `${workflowId}.json`);
+      if (await fs.pathExists(localFilePath)) {
+        await fs.remove(localFilePath);
+        console.log(`[WORKFLOW] Deleted workflow ${workflowId} from local file system`);
+      }
+      
+      return { success: true, message: `Workflow ${workflowId} deleted successfully` };
+    } catch (error) {
+      console.error(`[WORKFLOW] Error deleting workflow ${workflowId}:`, error);
+      throw error;
+    }
   }
 }
 
