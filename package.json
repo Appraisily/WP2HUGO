@@ -2,9 +2,10 @@
   "name": "wp2hugo",
   "version": "1.0.0",
   "description": "Tool to generate SEO-optimized Hugo content from keywords",
-  "main": "process-keywords.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node process-keywords.js",
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
     "test": "node test.js",
     "test:offline": "node test-offline.js",
     "image-service": "node start-image-service.js",

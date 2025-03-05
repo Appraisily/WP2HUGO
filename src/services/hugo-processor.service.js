@@ -2,22 +2,34 @@ const contentStorage = require('../utils/storage');
 const workflowService = require('./hugo/workflow.service');
 const contentGenerator = require('./hugo/content-generator.service');
 const { createSlug } = require('../utils/slug');
+const keywordResearchService = require('./keyword-research.service');
 
 class HugoProcessorService {
   async processWorkflow(keyword) {
     try {
-      // Pass the keyword to the workflow service if provided
-      if (keyword) {
-        console.log(`[HUGO] Processing workflow for specific keyword: ${keyword}`);
-        return await workflowService.processRow({ 'KWs': keyword });
-      } else {
-        // Original batch processing logic
-        console.log('[HUGO] Processing batch workflow (no specific keyword provided)');
+      if (!keyword) {
+        console.log('[HUGO] No specific keyword provided, processing batch workflow');
         return await workflowService.processWorkflow();
       }
+
+      console.log(`[HUGO] Processing workflow for specific keyword: ${keyword}`);
+      
+      // Step 1: Fetch data from all KWRDS API endpoints
+      console.log(`[HUGO] Fetching all KWRDS data for keyword: ${keyword}`);
+      const kwrdsData = await keywordResearchService.fetchAllKwrdsData(keyword);
+      
+      console.log(`[HUGO] Successfully fetched KWRDS data for keyword: ${keyword}`);
+      
+      // Step 2: Process the remaining workflow
+      return await workflowService.processRow({ 'KWs': keyword });
     } catch (error) {
       console.error('[HUGO] Critical error in workflow processing:', error);
-      throw error;
+      return {
+        success: false,
+        keyword,
+        error: error.message,
+        message: `Error processing workflow: ${error.message}`
+      };
     }
   }
 

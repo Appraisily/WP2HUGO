@@ -3,6 +3,7 @@ const path = require('path');
 const config = require('../config');
 const localStorage = require('../utils/local-storage');
 const slugify = require('../utils/slugify');
+const contentStorage = require('../utils/storage');
 
 class KeywordResearchService {
   constructor() {
@@ -12,6 +13,11 @@ class KeywordResearchService {
     this.useMockData = false;
     this.forceApi = false;
     this.isDevelopment = process.env.NODE_ENV === 'development';
+    this.endpoints = {
+      keywordsWithVolumes: '/keywords-with-volumes',
+      keywordExpansion: '/keyword-expansion',
+      keywordSuggestions: '/keyword-suggestions'
+    };
   }
 
   // Add method to force using API data
@@ -33,8 +39,11 @@ class KeywordResearchService {
           console.log('[KEYWORD-RESEARCH] Running in development mode. Using mock data for testing.');
           this.useMockData = true;
         } else {
-          console.error('[KEYWORD-RESEARCH] Running in production without API key. Service will not function properly.');
-          this.useMockData = false;
+          // In production, throw an error if API key is missing
+          const error = new Error('KWRDS API key not found. Service cannot operate in production without an API key.');
+          error.code = 'MISSING_API_KEY';
+          error.service = 'KEYWORD-RESEARCH';
+          throw error;
         }
       } else {
         console.log('[KEYWORD-RESEARCH] API key found. Using real API data.');
@@ -49,12 +58,13 @@ class KeywordResearchService {
       
       // Only use mock data in development
       if (this.isDevelopment) {
+        console.warn('[KEYWORD-RESEARCH] Development mode: Using mock data due to initialization error.');
         this.useMockData = true;
         this.initialized = true;
         return true;
       } else {
         // In production, don't initialize if there's an error
-        throw new Error(`Failed to initialize keyword research service: ${error.message}`);
+        throw error;
       }
     }
   }
@@ -280,6 +290,7 @@ class KeywordResearchService {
       
       // If in development and using mock data, generate mock data
       if (this.isDevelopment && this.useMockData) {
+        console.log(`[KEYWORD-RESEARCH] Using mock data for development: "${keyword}"`);
         const mockData = this.generateMockData(keyword);
         await localStorage.saveFile(filePath, mockData);
         return mockData;
@@ -287,6 +298,12 @@ class KeywordResearchService {
       
       // Otherwise, call the API with the proper endpoint
       console.log(`[KEYWORD-RESEARCH] Calling API for: "${keyword}"`);
+      
+      // Validate API key is present
+      if (!this.apiKey) {
+        throw new Error('Cannot call API without an API key');
+      }
+      
       const response = await axios.post(
         `${this.baseUrl}/keywords-with-volumes`,
         {
@@ -297,20 +314,39 @@ class KeywordResearchService {
           headers: {
             'Content-Type': 'application/json',
             'X-API-KEY': this.apiKey
-          }
+          },
+          timeout: 30000 // 30 second timeout
         }
       );
+      
+      // Log successful API call
+      console.log(`[KEYWORD-RESEARCH] API call successful for: "${keyword}"`);
       
       // Save data to file
       await localStorage.saveFile(filePath, response.data);
       
       return response.data;
     } catch (error) {
-      console.error(`[KEYWORD-RESEARCH] Error researching keyword "${keyword}":`, error);
+      // Enhanced error logging
+      if (error.response) {
+        // The request was made and the server responded with a status code outside of 2xx
+        console.error(`[KEYWORD-RESEARCH] API error for "${keyword}":`, {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          headers: error.response.headers
+        });
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error(`[KEYWORD-RESEARCH] No response for "${keyword}":`, error.request);
+      } else {
+        // Something happened in setting up the request
+        console.error(`[KEYWORD-RESEARCH] Request setup error for "${keyword}":`, error.message);
+      }
       
       // Only use mock data in development
       if (this.isDevelopment && this.useMockData) {
-        console.log(`[KEYWORD-RESEARCH] Generating mock data in development mode`);
+        console.warn(`[KEYWORD-RESEARCH] Development fallback: Using mock data due to API error`);
         const mockData = this.generateMockData(keyword);
         
         // Save mock data
@@ -321,8 +357,15 @@ class KeywordResearchService {
         return mockData;
       }
       
-      // Otherwise, propagate the error
-      throw new Error(`API error while researching keyword "${keyword}": ${error.message}`);
+      // In production, create a detailed error object and throw it
+      const enhancedError = new Error(`API error while researching keyword "${keyword}": ${error.message}`);
+      enhancedError.originalError = error;
+      enhancedError.status = error.response?.status;
+      enhancedError.data = error.response?.data;
+      enhancedError.service = 'KEYWORD-RESEARCH';
+      enhancedError.endpoint = `${this.baseUrl}/keywords-with-volumes`;
+      enhancedError.params = { keyword };
+      throw enhancedError;
     }
   }
 
@@ -460,6 +503,445 @@ class KeywordResearchService {
       console.error(`[KEYWORD-RESEARCH] Error getting SERP data for "${keyword}":`, error.response?.data || error.message);
       throw error;
     }
+  }
+
+  /**
+   * Fetch data from all KWRDS endpoints for a keyword and save to GCS 
+   * with the specified folder structure
+   * @param {string} keyword - The keyword to research
+   * @returns {object} - Combined data from all endpoints
+   */
+  async fetchAllKwrdsData(keyword) {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+    
+    console.log(`[KEYWORD-RESEARCH] Fetching all KWRDS data for: "${keyword}"`);
+    
+    try {
+      // Create folder path for the content
+      const contentFolder = `content/${keyword}/research`;
+      
+      // Fetch data from all three endpoints in parallel
+      const [keywordsWithVolumesData, keywordExpansionData, keywordSuggestionsData] = await Promise.all([
+        this.fetchKeywordsWithVolumes(keyword, contentFolder),
+        this.fetchKeywordExpansion(keyword, contentFolder),
+        this.fetchKeywordSuggestions(keyword, contentFolder)
+      ]);
+      
+      return {
+        keywordsWithVolumes: keywordsWithVolumesData,
+        keywordExpansion: keywordExpansionData,
+        keywordSuggestions: keywordSuggestionsData,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error(`[KEYWORD-RESEARCH] Error fetching all KWRDS data for "${keyword}":`, error.message);
+      
+      // In development mode only, we can use mock data
+      if (this.isDevelopment && this.useMockData) {
+        console.warn('[KEYWORD-RESEARCH] Using mock data because running in development mode');
+        return this.generateMockDataForAllEndpoints(keyword);
+      }
+      
+      // In production, always propagate the error
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch data from the keywords-with-volumes endpoint
+   * @param {string} keyword - The keyword to research
+   * @param {string} contentFolder - Folder path for storage
+   * @returns {object} - The keyword data
+   */
+  async fetchKeywordsWithVolumes(keyword, contentFolder) {
+    console.log(`[KEYWORD-RESEARCH] Fetching keywords-with-volumes for: "${keyword}"`);
+    
+    try {
+      // If in development and using mock data, generate mock data
+      if (this.isDevelopment && this.useMockData) {
+        console.log(`[KEYWORD-RESEARCH] Using mock data for development: "${keyword}"`);
+        const mockData = this.generateMockData(keyword);
+        
+        // Store mock data
+        await contentStorage.storeContent(
+          `${contentFolder}/keywords-with-volumes.json`,
+          mockData,
+          { type: 'keywords_with_volumes', keyword }
+        );
+        
+        return mockData;
+      }
+      
+      // Otherwise, call the API with the proper endpoint
+      console.log(`[KEYWORD-RESEARCH] Calling keywords-with-volumes API for: "${keyword}"`);
+      
+      // Validate API key is present
+      if (!this.apiKey) {
+        throw new Error('Cannot call API without an API key');
+      }
+      
+      const response = await axios.post(
+        `${this.baseUrl}${this.endpoints.keywordsWithVolumes}`,
+        {
+          search_question: keyword,
+          search_country: "en-US"
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-KEY': this.apiKey
+          },
+          timeout: 30000 // 30 second timeout
+        }
+      );
+      
+      // Log successful API call
+      console.log(`[KEYWORD-RESEARCH] keywords-with-volumes API call successful for: "${keyword}"`);
+      
+      // Save data to file with the specified folder structure
+      await contentStorage.storeContent(
+        `${contentFolder}/keywords-with-volumes.json`,
+        response.data,
+        { type: 'keywords_with_volumes', keyword }
+      );
+      
+      return response.data;
+    } catch (error) {
+      // Enhanced error logging
+      this.logApiError(error, keyword, 'keywords-with-volumes');
+      
+      // Only use mock data in development
+      if (this.isDevelopment && this.useMockData) {
+        console.warn(`[KEYWORD-RESEARCH] Development fallback: Using mock data due to API error`);
+        const mockData = this.generateMockData(keyword);
+        
+        // Save mock data
+        await contentStorage.storeContent(
+          `${contentFolder}/keywords-with-volumes.json`,
+          mockData,
+          { type: 'keywords_with_volumes', keyword }
+        );
+        
+        return mockData;
+      }
+      
+      // In production, throw a detailed error
+      this.throwEnhancedError(error, keyword, 'keywords-with-volumes');
+    }
+  }
+
+  /**
+   * Fetch data from the keyword-expansion endpoint
+   * @param {string} keyword - The keyword to research
+   * @param {string} contentFolder - Folder path for storage
+   * @returns {object} - The keyword expansion data
+   */
+  async fetchKeywordExpansion(keyword, contentFolder) {
+    console.log(`[KEYWORD-RESEARCH] Fetching keyword-expansion for: "${keyword}"`);
+    
+    try {
+      // If in development and using mock data, generate mock data
+      if (this.isDevelopment && this.useMockData) {
+        console.log(`[KEYWORD-RESEARCH] Using mock data for development: "${keyword}"`);
+        const mockData = this.generateMockExpansionData(keyword);
+        
+        // Store mock data
+        await contentStorage.storeContent(
+          `${contentFolder}/keyword-expansion.json`,
+          mockData,
+          { type: 'keyword_expansion', keyword }
+        );
+        
+        return mockData;
+      }
+      
+      // Otherwise, call the API with the proper endpoint
+      console.log(`[KEYWORD-RESEARCH] Calling keyword-expansion API for: "${keyword}"`);
+      
+      // Validate API key is present
+      if (!this.apiKey) {
+        throw new Error('Cannot call API without an API key');
+      }
+      
+      const response = await axios.post(
+        `${this.baseUrl}${this.endpoints.keywordExpansion}`,
+        {
+          search_question: keyword,
+          search_country: "en-US"
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-KEY': this.apiKey
+          },
+          timeout: 30000 // 30 second timeout
+        }
+      );
+      
+      // Log successful API call
+      console.log(`[KEYWORD-RESEARCH] keyword-expansion API call successful for: "${keyword}"`);
+      
+      // Save data to file with the specified folder structure
+      await contentStorage.storeContent(
+        `${contentFolder}/keyword-expansion.json`,
+        response.data,
+        { type: 'keyword_expansion', keyword }
+      );
+      
+      return response.data;
+    } catch (error) {
+      // Enhanced error logging
+      this.logApiError(error, keyword, 'keyword-expansion');
+      
+      // Only use mock data in development
+      if (this.isDevelopment && this.useMockData) {
+        console.warn(`[KEYWORD-RESEARCH] Development fallback: Using mock data due to API error`);
+        const mockData = this.generateMockExpansionData(keyword);
+        
+        // Save mock data
+        await contentStorage.storeContent(
+          `${contentFolder}/keyword-expansion.json`,
+          mockData,
+          { type: 'keyword_expansion', keyword }
+        );
+        
+        return mockData;
+      }
+      
+      // In production, throw a detailed error
+      this.throwEnhancedError(error, keyword, 'keyword-expansion');
+    }
+  }
+
+  /**
+   * Fetch data from the keyword-suggestions endpoint
+   * @param {string} keyword - The keyword to research
+   * @param {string} contentFolder - Folder path for storage
+   * @returns {object} - The keyword suggestions data
+   */
+  async fetchKeywordSuggestions(keyword, contentFolder) {
+    console.log(`[KEYWORD-RESEARCH] Fetching keyword-suggestions for: "${keyword}"`);
+    
+    try {
+      // If in development and using mock data, generate mock data
+      if (this.isDevelopment && this.useMockData) {
+        console.log(`[KEYWORD-RESEARCH] Using mock data for development: "${keyword}"`);
+        const mockData = this.generateMockSuggestionsData(keyword);
+        
+        // Store mock data
+        await contentStorage.storeContent(
+          `${contentFolder}/keyword-suggestions.json`,
+          mockData,
+          { type: 'keyword_suggestions', keyword }
+        );
+        
+        return mockData;
+      }
+      
+      // Otherwise, call the API with the proper endpoint
+      console.log(`[KEYWORD-RESEARCH] Calling keyword-suggestions API for: "${keyword}"`);
+      
+      // Validate API key is present
+      if (!this.apiKey) {
+        throw new Error('Cannot call API without an API key');
+      }
+      
+      const response = await axios.post(
+        `${this.baseUrl}${this.endpoints.keywordSuggestions}`,
+        {
+          search_question: keyword,
+          search_country: "en-US"
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-KEY': this.apiKey
+          },
+          timeout: 30000 // 30 second timeout
+        }
+      );
+      
+      // Log successful API call
+      console.log(`[KEYWORD-RESEARCH] keyword-suggestions API call successful for: "${keyword}"`);
+      
+      // Save data to file with the specified folder structure
+      await contentStorage.storeContent(
+        `${contentFolder}/keyword-suggestions.json`,
+        response.data,
+        { type: 'keyword_suggestions', keyword }
+      );
+      
+      return response.data;
+    } catch (error) {
+      // Enhanced error logging
+      this.logApiError(error, keyword, 'keyword-suggestions');
+      
+      // Only use mock data in development
+      if (this.isDevelopment && this.useMockData) {
+        console.warn(`[KEYWORD-RESEARCH] Development fallback: Using mock data due to API error`);
+        const mockData = this.generateMockSuggestionsData(keyword);
+        
+        // Save mock data
+        await contentStorage.storeContent(
+          `${contentFolder}/keyword-suggestions.json`,
+          mockData,
+          { type: 'keyword_suggestions', keyword }
+        );
+        
+        return mockData;
+      }
+      
+      // In production, throw a detailed error
+      this.throwEnhancedError(error, keyword, 'keyword-suggestions');
+    }
+  }
+
+  /**
+   * Generate mock data for keyword expansion endpoint
+   * @param {string} keyword - The keyword to generate mock data for
+   * @returns {object} - The mock data
+   */
+  generateMockExpansionData(keyword) {
+    if (!this.isDevelopment) {
+      throw new Error('Mock data generation is only available in development environment');
+    }
+    
+    console.log(`[KEYWORD-RESEARCH] Generating mock expansion data for: "${keyword}"`);
+    
+    // Generate expanded keywords
+    const expandedKeywords = [
+      `best ${keyword}`,
+      `${keyword} online`,
+      `${keyword} guide`,
+      `how to ${keyword}`,
+      `${keyword} near me`,
+      `${keyword} review`,
+      `affordable ${keyword}`,
+      `cheap ${keyword}`,
+      `premium ${keyword}`,
+      `${keyword} benefits`
+    ];
+    
+    return {
+      keyword,
+      expanded_keywords: expandedKeywords.map((kw, index) => ({
+        keyword: kw,
+        volume: Math.floor(Math.random() * 5000) + 100,
+        cpc: (Math.random() * 3).toFixed(2),
+        competition: Math.random().toFixed(2),
+        keyword_difficulty: Math.floor(Math.random() * 100)
+      })),
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Generate mock data for keyword suggestions endpoint
+   * @param {string} keyword - The keyword to generate mock data for
+   * @returns {object} - The mock data
+   */
+  generateMockSuggestionsData(keyword) {
+    if (!this.isDevelopment) {
+      throw new Error('Mock data generation is only available in development environment');
+    }
+    
+    console.log(`[KEYWORD-RESEARCH] Generating mock suggestions data for: "${keyword}"`);
+    
+    // Generate suggestion categories
+    const categories = [
+      'Questions',
+      'Prepositions',
+      'Comparisons',
+      'Alphabetical',
+      'Related'
+    ];
+    
+    const suggestions = {};
+    
+    categories.forEach(category => {
+      suggestions[category] = Array.from({ length: 5 }, (_, i) => {
+        const suffix = i + 1;
+        switch (category) {
+          case 'Questions':
+            return `why ${keyword} ${suffix}`;
+          case 'Prepositions':
+            return `${keyword} with ${suffix}`;
+          case 'Comparisons':
+            return `${keyword} vs ${suffix}`;
+          case 'Alphabetical':
+            return `${keyword} ${String.fromCharCode(97 + i)}`;
+          case 'Related':
+            return `${keyword} related ${suffix}`;
+          default:
+            return `${keyword} ${suffix}`;
+        }
+      });
+    });
+    
+    return {
+      keyword,
+      suggestions,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Generate mock data for all endpoints
+   * @param {string} keyword - The keyword to generate mock data for
+   * @returns {object} - The mock data
+   */
+  generateMockDataForAllEndpoints(keyword) {
+    return {
+      keywordsWithVolumes: this.generateMockData(keyword),
+      keywordExpansion: this.generateMockExpansionData(keyword),
+      keywordSuggestions: this.generateMockSuggestionsData(keyword),
+      timestamp: new Date().toISOString(),
+      isMock: true
+    };
+  }
+
+  /**
+   * Log API errors in a standardized format
+   * @param {Error} error - The error object
+   * @param {string} keyword - The keyword being processed
+   * @param {string} endpoint - The endpoint being called
+   */
+  logApiError(error, keyword, endpoint) {
+    if (error.response) {
+      // The request was made and the server responded with a status code outside of 2xx
+      console.error(`[KEYWORD-RESEARCH] API error for "${keyword}" at ${endpoint}:`, {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        headers: error.response.headers
+      });
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error(`[KEYWORD-RESEARCH] No response for "${keyword}" at ${endpoint}:`, error.request);
+    } else {
+      // Something happened in setting up the request
+      console.error(`[KEYWORD-RESEARCH] Request setup error for "${keyword}" at ${endpoint}:`, error.message);
+    }
+  }
+
+  /**
+   * Create and throw an enhanced error object
+   * @param {Error} error - The original error
+   * @param {string} keyword - The keyword being processed
+   * @param {string} endpoint - The endpoint being called
+   * @throws {Error} - An enhanced error with additional context
+   */
+  throwEnhancedError(error, keyword, endpoint) {
+    const enhancedError = new Error(`API error calling ${endpoint} for keyword "${keyword}": ${error.message}`);
+    enhancedError.originalError = error;
+    enhancedError.status = error.response?.status;
+    enhancedError.data = error.response?.data;
+    enhancedError.service = 'KEYWORD-RESEARCH';
+    enhancedError.endpoint = `${this.baseUrl}/${endpoint}`;
+    enhancedError.params = { keyword };
+    throw enhancedError;
   }
 }
 
