@@ -1,0 +1,43 @@
+{
+  "pasf": [
+    "test keyword value",
+    "test keyword appraisal cost",
+    "test keyword for beginners",
+    "test keyword near me",
+    "test keyword online",
+    "test keyword vs authentication",
+    "how to choose test keyword service",
+    "best test keyword services"
+  ],
+  "pasf_trending": [
+    "test keyword online",
+    "test keyword value"
+  ],
+  "serp": [
+    {
+      "est_monthly_traffic": 12500,
+      "title": "Complete Guide to Test keyword",
+      "url": "https://www.example.com/guide-to-test-keyword"
+    },
+    {
+      "est_monthly_traffic": 8700,
+      "title": "How to Get Professional Test keyword",
+      "url": "https://www.antiques-magazine.com/test-keyword"
+    },
+    {
+      "est_monthly_traffic": 5400,
+      "title": "Test keyword: Expert Tips and Tricks",
+      "url": "https://www.antiquelamps.org/test-keyword-guide"
+    },
+    {
+      "est_monthly_traffic": 3200,
+      "title": "What You Need to Know About Test keyword",
+      "url": "https://www.collectibles-value.com/test-keyword"
+    },
+    {
+      "est_monthly_traffic": 2100,
+      "title": "The Value of Professional Test keyword",
+      "url": "https://www.heritage-appraisals.com/test-keyword"
+    }
+  ]
+}

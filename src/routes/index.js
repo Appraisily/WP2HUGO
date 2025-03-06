@@ -1,28 +1,71 @@
 const express = require('express');
 const router = express.Router();
-const contentController = require('../controllers/content.controller');
-const workerController = require('../controllers/worker.controller');
-const hugoController = require('../controllers/hugo.controller');
+const workflowService = require('../services/workflow.service');
 
-// Health check endpoint
-router.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+/**
+ * Process a keyword through the complete workflow
+ * POST /api/process
+ */
+router.post('/process', async (req, res, next) => {
+  try {
+    const { keyword } = req.body;
+    
+    if (!keyword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Keyword is required'
+      });
+    }
+    
+    console.log(`[ROUTES] Processing keyword: ${keyword}`);
+    const result = await workflowService.processKeyword(keyword);
+    
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
-// Content storage endpoints
-router.get('/content/:path(*)', contentController.getContent);
-router.post('/content/:path(*)', contentController.storeContent);
+/**
+ * Get the status of a workflow for a keyword
+ * GET /api/status/:keyword
+ */
+router.get('/status/:keyword', async (req, res, next) => {
+  try {
+    const { keyword } = req.params;
+    
+    console.log(`[ROUTES] Getting status for keyword: ${keyword}`);
+    const workflow = await workflowService.getWorkflow(keyword);
+    
+    if (!workflow) {
+      return res.status(404).json({
+        success: false,
+        error: 'Workflow not found for this keyword'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: workflow
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
-// Hugo content endpoints
-router.post('/hugo/process', workerController.processWorkflow);
-router.post('/hugo/process-keyword', workerController.processKeyword);
-
-// Hugo management endpoints
-router.get('/hugo/workflows', hugoController.getWorkflows);
-router.post('/hugo/workflows', hugoController.createWorkflow);
-router.get('/hugo/workflows/:id', hugoController.getWorkflow);
-router.put('/hugo/workflows/:id', hugoController.updateWorkflow);
-router.delete('/hugo/workflows/:id', hugoController.deleteWorkflow);
-router.post('/hugo/workflows/:id/steps/:step', hugoController.updateWorkflowStep);
+/**
+ * Health check endpoint
+ * GET /api/health
+ */
+router.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok',
+    service: 'wp2hugo',
+    timestamp: new Date().toISOString()
+  });
+});
 
 module.exports = router;
